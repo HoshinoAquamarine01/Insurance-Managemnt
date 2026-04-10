@@ -1,0 +1,9 @@
+const ROLES = {
+  LAP_HOP_DONG: "LAP_HOP_DONG",
+  NGUOI_DUOC_BAO_HIEM: "NGUOI_DUOC_BAO_HIEM",
+  KE_TOAN: "KE_TOAN",
+  GIAM_SAT: "GIAM_SAT",
+  ADMIN: "ADMIN",
+};
+
+module.exports = { ROLES };
