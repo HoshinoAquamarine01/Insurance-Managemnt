@@ -1,0 +1,37 @@
+@import "tailwindcss" source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+
+@theme {
+  --color-brand-50: #d0f4f1;
+  --color-brand-100: #b3ebe6;
+  --color-brand-200: #7dd9d0;
+  --color-brand-300: #47c7ba;
+  --color-brand-400: #0d9488;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #0d5d54;
+  --color-brand-900: #0a3d38;
+
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  --color-creator: #f97316;
+  --color-accountant: #8b5cf6;
+  --color-supervisor: #6366f1;
+  --color-admin: #64748b;
+
+  --color-neutral-50: #f9fafb;
+  --color-neutral-100: #f3f4f6;
+  --color-neutral-200: #e5e7eb;
+  --color-neutral-300: #d1d5db;
+  --color-neutral-400: #9ca3af;
+  --color-neutral-500: #6b7280;
+  --color-neutral-600: #4b5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1f2937;
+  --color-neutral-900: #111827;
+}
+
+@import "tw-animate-css";

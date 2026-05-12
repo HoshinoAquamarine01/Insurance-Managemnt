@@ -1,81 +1,55 @@
-# Backend quan ly bao hiem (MongoDB)
+# QLBH Backend (MVC + SQL Server)
 
-Backend Node.js + Express + MongoDB cho de tai quan ly bao hiem.
+Backend API theo kiến truc MVC ro rang:
 
-## Ky thuat bao mat da dung
+- Model: truy van SQL Server qua `mssql`
+- View: response JSON thong nhat
+- Controller: xu ly nghiep vu
+- Router: khai bao endpoint
+- Middleware: validate, role-check, error handler
 
-1. RBAC (Role-Based Access Control)
-
-- Phan quyen theo vai tro: `LAP_HOP_DONG`, `NGUOI_DUOC_BAO_HIEM`, `KE_TOAN`, `GIAM_SAT`, `ADMIN`.
-- Gioi han SELECT/UPDATE theo vai tro va pham vi du lieu duoc phan cong.
-
-2. HASH mat khau
-
-- Dung `bcrypt` de bam mat khau truoc khi luu (`passwordHash`).
-
-3. Ma hoa doi xung AES-256-GCM
-
-- Ma hoa du lieu nhay cam trong `InsuredPerson`: dia chi, lich su benh.
-
-4. Chong injection
-
-- Validate input voi `express-validator`.
-- Loai bo toan tu doc hai trong payload voi `express-mongo-sanitize`.
-
-5. Auditing
-
-- Ghi nhat ky truy cap vao collection `AccessLog` cho cac hanh dong SELECT/INSERT/UPDATE.
-
-## Cau truc chinh
-
-- `src/models/*`: cac collection theo de tai
-- `src/routes/*`: API
-- `src/middleware/*`: auth, authorize, validate
-- `src/utils/crypto.js`: AES encrypt/decrypt
-- `src/services/auditService.js`: ghi audit log
-
-## Chay du an
-
-1. Cai package
+## 1) Cai dat
 
 ```bash
 npm install
+cp .env.example .env
 ```
 
-2. Tao file `.env` tu `.env.example`
+Cap nhat `.env` voi thong tin SQL Server cua ban.
 
-3. Chay dev
+Neu SQL Server cua ban dang dung Windows Authentication, dat:
+
+```env
+DB_AUTH_MODE=windows
+DB_SERVER=localhost
+DB_NAME=QLBH
+```
+
+## 2) Tao bang
+
+Chay script trong `sql/init.sql` tren SQL Server.
+
+## 3) Chay server
 
 ```bash
 npm run dev
 ```
 
-4. Kiem tra health
+API base: `http://localhost:5000/api`
 
-```bash
-GET http://localhost:3000/health
-```
+## 4) Endpoint chinh
 
-## API nhanh
+- `GET /api/health`
+- `POST /api/employees/login`
+- `GET /api/employees` (x-role: admin|giamsat)
+- `POST /api/employees` (x-role: admin)
+- `GET /api/customers` (x-role: admin|giamsat|lap_hop_dong)
+- `POST /api/customers` (x-role: admin|lap_hop_dong)
+- `GET /api/contracts` (x-role: admin|giamsat)
+- `POST /api/contracts` (x-role: admin|lap_hop_dong)
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/insured-persons`
-- `GET /api/insured-persons/:id`
-- `POST /api/contracts`
-- `GET /api/contracts`
-- `GET /api/contracts/:id`
-- `PATCH /api/contracts/:id`
-- `GET /api/me/contracts`
-- `GET /api/me/payments`
-- `POST /api/admin/insurance-types`
-- `POST /api/admin/assignments/accounting`
-- `POST /api/admin/assignments/supervisor`
-- `GET /api/admin/audit-logs`
+## 5) Bao mat da ap dung
 
-## Ghi chu nghiep vu
-
-- Nguoi lap hop dong chi xem/sua hop dong do chinh ho tao.
-- Nguoi duoc bao hiem chi xem du lieu cua minh.
-- Ke toan/Giam sat chi xem hop dong thuoc loai bao hiem duoc phan cong.
-- Du lieu nhay cam cua NDBH duoc ma hoa truoc khi luu DB.
+- Parameterized query: chong SQL injection
+- Hash mat khau SHA2_512 voi `HASHBYTES`
+- Role check tai middleware va role DB co ban trong `init.sql`

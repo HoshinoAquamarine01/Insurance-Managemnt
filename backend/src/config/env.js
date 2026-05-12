@@ -1,21 +1,21 @@
-const dotenv = require("dotenv");
+function validateEnv() {
+  const authMode = String(process.env.DB_AUTH_MODE || "sql").toLowerCase();
+  const baseRequiredVars = ["DB_SERVER", "DB_NAME"];
+  const sqlAuthRequiredVars = ["DB_USER", "DB_PASSWORD"];
+  const requiredVars =
+    authMode === "windows"
+      ? baseRequiredVars
+      : [...baseRequiredVars, ...sqlAuthRequiredVars];
 
-dotenv.config();
+  const missing = requiredVars.filter((name) => !process.env[name]);
 
-const required = ["MONGODB_URI", "JWT_SECRET", "APP_AES_KEY"];
-
-required.forEach((key) => {
-  if (!process.env[key]) {
-    throw new Error(`Missing required env var: ${key}`);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}`,
+    );
   }
-});
+}
 
-const env = {
-  port: Number(process.env.PORT || 3000),
-  mongodbUri: process.env.MONGODB_URI,
-  jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "8h",
-  appAesKey: process.env.APP_AES_KEY,
+module.exports = {
+  validateEnv,
 };
-
-module.exports = env;

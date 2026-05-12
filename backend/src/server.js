@@ -1,53 +1,63 @@
-const express = require("express");
-const helmet = require("helmet");
-const cors = require("cors");
-const env = require("./config/env");
-const { connectMongo } = require("./db/mongoose");
+const app = require("./app");
+const { getPool } = require("./config/db");
 
-const authRoutes = require("./routes/authRoutes");
-const insuredRoutes = require("./routes/insuredRoutes");
-const contractRoutes = require("./routes/contractRoutes");
-const meRoutes = require("./routes/meRoutes");
-const adminRoutes = require("./routes/adminRoutes");
+const port = Number(process.env.PORT || 5000);
 
-const app = express();
-
-app.use(helmet());
-app.use(cors());
-app.use(express.json({ limit: "1mb" }));
-
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+// Catch all unhandled rejections
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[FATAL] Unhandled Promise Rejection:", reason);
+  console.error("[FATAL] Promise:", promise);
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/insured-persons", insuredRoutes);
-app.use("/api/contracts", contractRoutes);
-app.use("/api/me", meRoutes);
-app.use("/api/admin", adminRoutes);
-
-app.use((err, req, res, next) => {
-  if (err?.name === "ValidationError") {
-    return res.status(400).json({ message: err.message });
-  }
-
-  return res.status(500).json({ message: "Internal Server Error" });
+// Catch all uncaught exceptions
+process.on("uncaughtException", (error) => {
+  console.error("[FATAL] Uncaught Exception:", error);
+  console.error("[FATAL] Stack:", error.stack);
+  // Don't exit - try to stay alive
+  console.error("[FATAL] Attempting to continue running...");
 });
 
-module.exports = app;
+// Log when process is about to exit
+process.on("exit", (code) => {
+  console.error(`[PROCESS_EXIT] Node.js process exiting with code ${code}`);
+});
 
-async function bootstrap() {
+async function startServer() {
   try {
-    await connectMongo();
-    app.listen(env.port, () => {
-      console.log(`Server is running on port ${env.port}`);
-    });
+    console.log("[SERVER] Initializing database pool...");
+    const pool = await getPool();
+    console.log("[SERVER] Database pool initialized successfully");
   } catch (error) {
-    console.error("Failed to start server:", error.message);
-    process.exit(1);
+    console.error("[SERVER] DB pool initialization failed:", error.message);
+    console.error(
+      "[SERVER] Continuing to start HTTP server without DB connection. Some endpoints may fail.",
+    );
   }
+
+  const server = app.listen(port, () => {
+    console.log(`[SERVER] Server listening on port ${port}`);
+  });
+
+  // Handle server errors (including port already in use)
+  server.on("error", (err) => {
+    console.error("[SERVER] HTTP Server error:", err.message);
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `[SERVER] Port ${port} is already in use. Please stop the other process or use a different port.`,
+      );
+      process.exit(1);
+    }
+    console.error("[SERVER] Full error:", err);
+  });
+
+  // Log when server is closed
+  server.on("close", () => {
+    console.log("[SERVER] HTTP Server closed");
+  });
+
+  return server;
 }
 
-if (require.main === module) {
-  bootstrap();
-}
+const serverPromise = startServer().catch((err) => {
+  console.error("[SERVER_ERROR] Failed to start server:", err);
+});
