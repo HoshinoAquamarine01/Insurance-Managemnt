@@ -27,6 +27,7 @@ import {
   CardTitle,
 } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
+import { Alert } from "../../components/common/Alert";
 import { Badge } from "../../components/ui/badge";
 import {
   Table,
@@ -634,28 +635,34 @@ export function InstallmentPaymentPage() {
             <motion.h1
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="font-display text-4xl md:text-5xl font-semibold tracking-tight"
+              className="font-display text-3xl md:text-4xl font-semibold tracking-tight"
             >
-              Thanh Toán Từng Kỳ
+              Thanh toán theo kỳ — SePay
             </motion.h1>
-            <p className="max-w-2xl text-muted-foreground text-base md:text-lg leading-7">
+            <p className="max-w-2xl text-muted-foreground text-sm md:text-base leading-7">
               Thanh toán SePay trực tiếp ngay trên trang này. Vui lòng quét mã
               QR, xác nhận đúng số tiền và nội dung chuyển khoản; trạng thái sẽ
               được cập nhật tự động khi webhook được ghi nhận.
             </p>
             {notice ? (
-              <div className="flex flex-wrap items-center gap-2 rounded-full border bg-background/80 px-4 py-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-status-active" />
-                <span>{notice}</span>
+              <div className="w-full max-w-2xl space-y-2">
+                <Alert
+                  message={notice}
+                  type="info"
+                  className="w-full"
+                  icon={<CheckCircle2 className="h-5 w-5 text-status-active" />}
+                />
                 {pendingTransferReport ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleReportTransferredFromCallback}
-                    disabled={reportingTransfer}
-                  >
-                    {reportingTransfer ? "Đang gửi..." : "Báo đã thanh toán"}
-                  </Button>
+                  <div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleReportTransferredFromCallback}
+                      disabled={reportingTransfer}
+                    >
+                      {reportingTransfer ? "Đang gửi..." : "Báo đã thanh toán"}
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -691,8 +698,8 @@ export function InstallmentPaymentPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Card className="bg-background/80 backdrop-blur-sm h-full min-h-[170px]">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="bg-background/80 backdrop-blur-sm h-full min-h-[170px] shadow-md">
               <CardHeader className="pb-2">
                 <CardDescription>Kỳ chưa đóng</CardDescription>
               </CardHeader>
@@ -702,7 +709,7 @@ export function InstallmentPaymentPage() {
                 </p>
               </CardContent>
             </Card>
-            <Card className="bg-background/80 backdrop-blur-sm h-full min-h-[170px]">
+            <Card className="bg-background/80 backdrop-blur-sm h-full min-h-[170px] shadow-md">
               <CardHeader className="pb-2">
                 <CardDescription>Tổng cần thanh toán</CardDescription>
               </CardHeader>
@@ -712,7 +719,7 @@ export function InstallmentPaymentPage() {
                 </p>
               </CardContent>
             </Card>
-            <Card className="bg-background/80 backdrop-blur-sm h-full min-h-[170px]">
+            <Card className="bg-background/80 backdrop-blur-sm h-full min-h-[170px] shadow-md">
               <CardHeader className="pb-2">
                 <CardDescription>Cổng thanh toán</CardDescription>
               </CardHeader>
@@ -739,7 +746,7 @@ export function InstallmentPaymentPage() {
           />
 
           <div className="grid gap-4 md:grid-cols-3">
-            <Card>
+            <Card className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <CardDescription>Kỳ đang thanh toán</CardDescription>
               </CardHeader>
@@ -752,7 +759,7 @@ export function InstallmentPaymentPage() {
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <CardDescription>Trạng thái hiện tại</CardDescription>
               </CardHeader>
@@ -768,7 +775,7 @@ export function InstallmentPaymentPage() {
                 )}
               </CardContent>
             </Card>
-            <Card>
+            <Card className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <CardDescription>Hành động</CardDescription>
               </CardHeader>

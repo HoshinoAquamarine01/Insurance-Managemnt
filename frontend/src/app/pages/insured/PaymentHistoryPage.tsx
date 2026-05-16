@@ -448,9 +448,7 @@ export function PaymentHistoryPage() {
         >
           Lịch sử thanh toán
         </motion.h1>
-        <p className="text-muted-foreground">
-          Lịch sử kỳ đóng phí lấy từ backend.
-        </p>
+
         {notice ? (
           <p className="mt-2 text-sm text-muted-foreground">{notice}</p>
         ) : null}

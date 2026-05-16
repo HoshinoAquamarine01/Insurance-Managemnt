@@ -169,8 +169,12 @@ async function buildContractScope(pool, userContext = {}) {
       return { condition: "1=0", request: pool.request() };
     }
 
+    // In the DB, H.IDNGUOIDUOCBH references NGUOIDUOCBAOHIEM.IDNGUOIDUOCBH
+    // which is linked to NGUOIDUNG via NDB.IDNGUOIDUNG. Scope by the
+    // insured user's NGUOIDUNG id so that logged-in insured users can see
+    // their own contracts.
     return {
-      condition: "H.IDNGUOIDUOCBH = @USER_ID",
+      condition: "NDB.IDNGUOIDUNG = @USER_ID",
       request: pool.request().input("USER_ID", sql.BigInt, numericUserId),
     };
   }

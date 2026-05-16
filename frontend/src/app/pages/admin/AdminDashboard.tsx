@@ -19,6 +19,7 @@ import {
   getAdminUsers,
   getContracts,
   getDashboardSummary,
+  getInsuredAccounts,
   getInsuranceTypes,
 } from "../../services/api";
 import {
@@ -215,12 +216,19 @@ export function AdminDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [summary, setSummary] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
+  const [insuredAccounts, setInsuredAccounts] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [insuranceTypes, setInsuranceTypes] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [activityPage, setActivityPage] = useState(1);
   const ACTIVITY_PAGE_SIZE = 10;
+  const [usersPage, setUsersPage] = useState(1);
+  const USERS_PAGE_SIZE = 10;
+  const [assignmentsPage, setAssignmentsPage] = useState(1);
+  const ASSIGNMENTS_PAGE_SIZE = 10;
+  const [contractsPage, setContractsPage] = useState(1);
+  const CONTRACTS_PAGE_SIZE = 10;
   const [loading, setLoading] = useState(true);
   const [userFormOpen, setUserFormOpen] = useState(false);
   const [insuranceTypeFormOpen, setInsuranceTypeFormOpen] = useState(false);
@@ -299,6 +307,7 @@ export function AdminDashboard() {
         const [
           summaryData,
           usersData,
+          insuredAccountsData,
           contractsData,
           insuranceTypesData,
           assignmentsData,
@@ -306,6 +315,7 @@ export function AdminDashboard() {
         ] = await Promise.all([
           getDashboardSummary(user.role),
           getAdminUsers(user.role),
+          getInsuredAccounts(user.role),
           getContracts(user.role),
           getInsuranceTypes(user.role),
           getAdminAssignments(user.role),
@@ -316,11 +326,15 @@ export function AdminDashboard() {
           console.debug("loadData: activityData (from API)", activityData);
           setSummary(summaryData);
           setUsers(usersData);
+          setInsuredAccounts(insuredAccountsData);
           setContracts(contractsData);
           setInsuranceTypes(insuranceTypesData);
           setAssignments(assignmentsData);
           setActivity(activityData);
           setActivityPage(1);
+          setUsersPage(1);
+          setAssignmentsPage(1);
+          setContractsPage(1);
         }
       } finally {
         if (isMounted) {
@@ -362,6 +376,9 @@ export function AdminDashboard() {
     setAssignments(assignmentsData);
     setActivity(activityData);
     setActivityPage(1);
+    setUsersPage(1);
+    setAssignmentsPage(1);
+    setContractsPage(1);
   }
 
   function openAssignForm(entry: any) {
@@ -990,130 +1007,141 @@ export function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((entry) => {
-                    const assignmentByUser = assignments.filter(
-                      (item) =>
-                        String(item.IDNGUOIDUNG) === String(entry.IDNGUOIDUNG),
-                    );
+                  {users.length > 0
+                    ? users
+                        .slice(
+                          (usersPage - 1) * USERS_PAGE_SIZE,
+                          usersPage * USERS_PAGE_SIZE,
+                        )
+                        .map((entry) => {
+                          const assignmentByUser = assignments.filter(
+                            (item) =>
+                              String(item.IDNGUOIDUNG) ===
+                              String(entry.IDNGUOIDUNG),
+                          );
 
-                    return (
-                      <tr
-                        key={entry.IDNGUOIDUNG}
-                        className="border-b border-border/60 last:border-0"
-                      >
-                        <td className="py-4 font-medium">
-                          {entry.HOTEN || "-"}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {entry.TENDANGNHAP || "-"}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {entry.EMAIL || "-"}
-                        </td>
-                        <td className="py-4">
-                          <Badge
-                            variant="outline"
-                            className="rounded-full capitalize"
-                          >
-                            {String(entry.MAVAITRO || "-").toLowerCase()}
-                          </Badge>
-                        </td>
-                        <td className="py-4 text-muted-foreground capitalize">
-                          {entry.LOAI_TAI_KHOAN || "-"}
-                        </td>
-                        <td className="py-4">
-                          <Badge
-                            variant="outline"
-                            className={`rounded-full ${getStatusTone(entry.TRANGTHAI)}`}
-                          >
-                            {normalizeText(entry.TRANGTHAI) || "-"}
-                          </Badge>
-                        </td>
-                        <td className="py-4">
-                          {assignmentByUser.length === 0 ? (
-                            <span className="text-muted-foreground">-</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              {assignmentByUser.map((assignment) => (
-                                <div
-                                  key={assignment.IDPHANCONG}
-                                  className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs"
+                          return (
+                            <tr
+                              key={entry.IDNGUOIDUNG}
+                              className="border-b border-border/60 last:border-0"
+                            >
+                              <td className="py-4 font-medium">
+                                {entry.HOTEN || "-"}
+                              </td>
+                              <td className="py-4 text-muted-foreground">
+                                {entry.TENDANGNHAP || "-"}
+                              </td>
+                              <td className="py-4 text-muted-foreground">
+                                {entry.EMAIL || "-"}
+                              </td>
+                              <td className="py-4">
+                                <Badge
+                                  variant="outline"
+                                  className="rounded-full capitalize"
                                 >
-                                  <span>{assignment.TENLOAI}</span>
-                                  <button
-                                    type="button"
-                                    className="text-muted-foreground hover:text-foreground"
-                                    onClick={() =>
-                                      void handleDeleteAssignment(assignment)
-                                    }
+                                  {String(entry.MAVAITRO || "-").toLowerCase()}
+                                </Badge>
+                              </td>
+                              <td className="py-4 text-muted-foreground capitalize">
+                                {entry.LOAI_TAI_KHOAN || "-"}
+                              </td>
+                              <td className="py-4">
+                                <Badge
+                                  variant="outline"
+                                  className={`rounded-full ${getStatusTone(entry.TRANGTHAI)}`}
+                                >
+                                  {normalizeText(entry.TRANGTHAI) || "-"}
+                                </Badge>
+                              </td>
+                              <td className="py-4">
+                                {assignmentByUser.length === 0 ? (
+                                  <span className="text-muted-foreground">
+                                    -
+                                  </span>
+                                ) : (
+                                  <div className="flex flex-wrap gap-2">
+                                    {assignmentByUser.map((assignment) => (
+                                      <div
+                                        key={assignment.IDPHANCONG}
+                                        className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs"
+                                      >
+                                        <span>{assignment.TENLOAI}</span>
+                                        <button
+                                          type="button"
+                                          className="text-muted-foreground hover:text-foreground"
+                                          onClick={() =>
+                                            void handleDeleteAssignment(
+                                              assignment,
+                                            )
+                                          }
+                                        >
+                                          x
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-4 text-muted-foreground">
+                                {formatDate(entry.NGAYTAO)}
+                              </td>
+                              <td className="py-4">
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openEditUserForm(entry)}
                                   >
-                                    x
-                                  </button>
+                                    Sửa
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => void handleDeleteUser(entry)}
+                                  >
+                                    Xóa
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => openAssignForm(entry)}
+                                  >
+                                    Phân công
+                                  </Button>
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {formatDate(entry.NGAYTAO)}
-                        </td>
-                        <td className="py-4">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openEditUserForm(entry)}
-                            >
-                              Sửa
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => void handleDeleteUser(entry)}
-                            >
-                              Xóa
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => openAssignForm(entry)}
-                            >
-                              Phân công
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              </td>
+                            </tr>
+                          );
+                        })
+                    : null}
                 </tbody>
               </table>
-              {/* Pagination controls */}
-              {activity.length > ACTIVITY_PAGE_SIZE && (
+              {/* Users pagination controls */}
+              {users.length > USERS_PAGE_SIZE && (
                 <div className="flex items-center justify-end gap-2 mt-3">
                   <button
                     className="px-2 py-1 rounded border"
-                    onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
-                    disabled={activityPage === 1}
+                    onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                    disabled={usersPage === 1}
                   >
                     Prev
                   </button>
                   <span className="text-sm text-muted-foreground">
-                    Trang {activityPage} /{" "}
-                    {Math.ceil(activity.length / ACTIVITY_PAGE_SIZE)}
+                    Trang {usersPage} /{" "}
+                    {Math.ceil(users.length / USERS_PAGE_SIZE)}
                   </span>
                   <button
                     className="px-2 py-1 rounded border"
                     onClick={() =>
-                      setActivityPage((p) =>
+                      setUsersPage((p) =>
                         Math.min(
-                          Math.ceil(activity.length / ACTIVITY_PAGE_SIZE),
+                          Math.ceil(users.length / USERS_PAGE_SIZE),
                           p + 1,
                         ),
                       )
                     }
                     disabled={
-                      activityPage >=
-                      Math.ceil(activity.length / ACTIVITY_PAGE_SIZE)
+                      usersPage >= Math.ceil(users.length / USERS_PAGE_SIZE)
                     }
                   >
                     Next
@@ -1226,7 +1254,13 @@ export function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredContracts.map((entry) => (
+                  {filteredContracts.length > 0
+                    ? filteredContracts
+                        .slice(
+                          (contractsPage - 1) * CONTRACTS_PAGE_SIZE,
+                          contractsPage * CONTRACTS_PAGE_SIZE,
+                        )
+                        .map((entry) => (
                     <tr
                       key={entry.IDHOPDONG}
                       className="border-b border-border/60 last:border-0"
@@ -1277,7 +1311,7 @@ export function AdminDashboard() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )) : null}
                   {filteredContracts.length === 0 ? (
                     <tr>
                       <td
@@ -1324,42 +1358,47 @@ export function AdminDashboard() {
                 </thead>
                 <tbody>
                   {assignments.length > 0 ? (
-                    assignments.map((entry) => (
-                      <tr
-                        key={entry.IDPHANCONG}
-                        className="border-b border-border/60 last:border-0"
-                      >
-                        <td className="py-4 font-medium">
-                          {entry.TENNGUOIDUNG || "-"}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {entry.TENDANGNHAP || "-"}
-                        </td>
-                        <td className="py-4">
-                          <Badge variant="outline" className="rounded-full">
-                            {entry.MAVAITRO || "-"}
-                          </Badge>
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {entry.TENLOAI || "-"}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {toDateOnly(entry.NGAYBATDAU)}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {toDateOnly(entry.NGAYKETTHUC)}
-                        </td>
-                        <td className="py-4">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => void handleDeleteAssignment(entry)}
-                          >
-                            Xóa
-                          </Button>
-                        </td>
-                      </tr>
-                    ))
+                    assignments
+                      .slice(
+                        (assignmentsPage - 1) * ASSIGNMENTS_PAGE_SIZE,
+                        assignmentsPage * ASSIGNMENTS_PAGE_SIZE,
+                      )
+                      .map((entry) => (
+                        <tr
+                          key={entry.IDPHANCONG}
+                          className="border-b border-border/60 last:border-0"
+                        >
+                          <td className="py-4 font-medium">
+                            {entry.TENNGUOIDUNG || "-"}
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {entry.TENDANGNHAP || "-"}
+                          </td>
+                          <td className="py-4">
+                            <Badge variant="outline" className="rounded-full">
+                              {entry.MAVAITRO || "-"}
+                            </Badge>
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {entry.TENLOAI || "-"}
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {toDateOnly(entry.NGAYBATDAU)}
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {toDateOnly(entry.NGAYKETTHUC)}
+                          </td>
+                          <td className="py-4">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => void handleDeleteAssignment(entry)}
+                            >
+                              Xóa
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
                   ) : (
                     <tr>
                       <td
@@ -1372,6 +1411,31 @@ export function AdminDashboard() {
                   )}
                 </tbody>
               </table>
+              {assignments.length > ASSIGNMENTS_PAGE_SIZE && (
+                <div className="flex items-center justify-end gap-2 mt-3">
+                  <button
+                    className="px-2 py-1 rounded border"
+                    onClick={() => setAssignmentsPage((p) => Math.max(1, p - 1))}
+                    disabled={assignmentsPage === 1}
+                  >
+                    Prev
+                  </button>
+                  <span className="text-sm text-muted-foreground">
+                    Trang {assignmentsPage} / {Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE)}
+                  </span>
+                  <button
+                    className="px-2 py-1 rounded border"
+                    onClick={() =>
+                      setAssignmentsPage((p) =>
+                        Math.min(Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE), p + 1),
+                      )
+                    }
+                    disabled={assignmentsPage >= Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE)}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1399,44 +1463,49 @@ export function AdminDashboard() {
                 </thead>
                 <tbody>
                   {activity.length > 0 ? (
-                    activity.map((entry) => (
-                      <tr
-                        key={
-                          entry.IDNHATKY ||
-                          `${entry.ENTITY_TYPE}-${entry.ENTITY_ID}-${String(getEventAt(entry))}`
-                        }
-                        className="border-b border-border/60 last:border-0"
-                      >
-                        <td className="py-4 text-muted-foreground">
-                          {formatDate(getEventAt(entry))}
-                        </td>
-                        <td className="py-4">
-                          <Badge variant="outline" className="rounded-full">
-                            {entry.ACTION_LABEL || getActivityLabel(entry)}
-                          </Badge>
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {entry.ENTITY_NAME || "-"}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {entry.ACTOR_NAME || "-"}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {entry.TARGET_NAME || "-"}
-                        </td>
-                        <td className="py-4 text-muted-foreground">
-                          {entry.DETAIL || "-"}
-                        </td>
-                        <td className="py-4">
-                          <Badge
-                            variant="outline"
-                            className={`rounded-full ${getStatusTone(entry.STATUS)}`}
-                          >
-                            {entry.STATUS || "-"}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))
+                    activity
+                      .slice(
+                        (activityPage - 1) * ACTIVITY_PAGE_SIZE,
+                        activityPage * ACTIVITY_PAGE_SIZE,
+                      )
+                      .map((entry) => (
+                        <tr
+                          key={
+                            entry.IDNHATKY ||
+                            `${entry.ENTITY_TYPE}-${entry.ENTITY_ID}-${String(getEventAt(entry))}`
+                          }
+                          className="border-b border-border/60 last:border-0"
+                        >
+                          <td className="py-4 text-muted-foreground">
+                            {formatDate(getEventAt(entry))}
+                          </td>
+                          <td className="py-4">
+                            <Badge variant="outline" className="rounded-full">
+                              {entry.ACTION_LABEL || getActivityLabel(entry)}
+                            </Badge>
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {entry.ENTITY_NAME || "-"}
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {entry.ACTOR_NAME || "-"}
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {entry.TARGET_NAME || "-"}
+                          </td>
+                          <td className="py-4 text-muted-foreground">
+                            {entry.DETAIL || "-"}
+                          </td>
+                          <td className="py-4">
+                            <Badge
+                              variant="outline"
+                              className={`rounded-full ${getStatusTone(entry.STATUS)}`}
+                            >
+                              {entry.STATUS || "-"}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))
                   ) : (
                     <tr>
                       <td
@@ -1449,6 +1518,38 @@ export function AdminDashboard() {
                   )}
                 </tbody>
               </table>
+              {activity.length > ACTIVITY_PAGE_SIZE && (
+                <div className="flex items-center justify-end gap-2 mt-3">
+                  <button
+                    className="px-2 py-1 rounded border"
+                    onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+                    disabled={activityPage === 1}
+                  >
+                    Prev
+                  </button>
+                  <span className="text-sm text-muted-foreground">
+                    Trang {activityPage} /{" "}
+                    {Math.ceil(activity.length / ACTIVITY_PAGE_SIZE)}
+                  </span>
+                  <button
+                    className="px-2 py-1 rounded border"
+                    onClick={() =>
+                      setActivityPage((p) =>
+                        Math.min(
+                          Math.ceil(activity.length / ACTIVITY_PAGE_SIZE),
+                          p + 1,
+                        ),
+                      )
+                    }
+                    disabled={
+                      activityPage >=
+                      Math.ceil(activity.length / ACTIVITY_PAGE_SIZE)
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1700,9 +1801,9 @@ export function AdminDashboard() {
             <div className="grid gap-4 md:grid-cols-3">
               <div className="grid gap-2">
                 <Label htmlFor="contract-insured">ID người được BH</Label>
-                <Input
+                <select
                   id="contract-insured"
-                  type="number"
+                  className="border-input bg-background h-11 w-full rounded-md border px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   value={contractForm.idNguoiduocBH}
                   onChange={(e) =>
                     setContractForm((prev) => ({
@@ -1710,9 +1811,22 @@ export function AdminDashboard() {
                       idNguoiduocBH: e.target.value,
                     }))
                   }
-                  min={1}
                   required
-                />
+                >
+                  <option value="">Chọn người được bảo hiểm</option>
+                  {insuredAccounts.map((a) => (
+                    <option
+                      key={String(a.IDNGUOIDUOCBH)}
+                      value={String(a.IDNGUOIDUOCBH)}
+                    >
+                      {String(
+                        a.HOTEN ||
+                          a.TENDANGNHAP ||
+                          `Insured ${a.IDNGUOIDUOCBH}`,
+                      )}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid gap-2">
@@ -1734,9 +1848,9 @@ export function AdminDashboard() {
 
               <div className="grid gap-2">
                 <Label htmlFor="contract-type-id">ID loại BH</Label>
-                <Input
+                <select
                   id="contract-type-id"
-                  type="number"
+                  className="border-input bg-background h-11 w-full rounded-md border px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   value={contractForm.idLoai}
                   onChange={(e) =>
                     setContractForm((prev) => ({
@@ -1744,16 +1858,22 @@ export function AdminDashboard() {
                       idLoai: e.target.value,
                     }))
                   }
-                  min={1}
                   required
-                />
+                >
+                  <option value="">Chọn loại bảo hiểm</option>
+                  {insuranceTypes.map((t) => (
+                    <option key={String(t.IDLOAI)} value={String(t.IDLOAI)}>
+                      {String(t.TENLOAI || `Loại ${t.IDLOAI}`)}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="contract-creator-id">ID người tạo</Label>
-                <Input
+                <select
                   id="contract-creator-id"
-                  type="number"
+                  className="border-input bg-background h-11 w-full rounded-md border px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   value={contractForm.idNguoiTao}
                   onChange={(e) =>
                     setContractForm((prev) => ({
@@ -1761,9 +1881,20 @@ export function AdminDashboard() {
                       idNguoiTao: e.target.value,
                     }))
                   }
-                  min={1}
                   required
-                />
+                >
+                  <option value="">Chọn người tạo</option>
+                  {users.map((u) => (
+                    <option
+                      key={String(u.IDNGUOIDUNG)}
+                      value={String(u.IDNGUOIDUNG)}
+                    >
+                      {String(
+                        u.HOTEN || u.TENDANGNHAP || `User ${u.IDNGUOIDUNG}`,
+                      )}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
