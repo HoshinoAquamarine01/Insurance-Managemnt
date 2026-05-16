@@ -44,15 +44,30 @@ async function resolveRoleId(pool, roleCode) {
 }
 
 async function writeAuditLog(pool, userId, tableName, dataId, action) {
-  await pool
-    .request()
-    .input("IDNGUOIDUNG", sql.BigInt, userId || null)
-    .input("TENBANG", sql.NVarChar(50), tableName)
-    .input("IDDULIEU", sql.BigInt, Number(dataId))
-    .input("HANHDONG", sql.NVarChar(20), action).query(`
-      INSERT INTO NHATKY (IDNGUOIDUNG, TENBANG, IDDULIEU, HANHDONG, THOIGIAN)
-      VALUES (@IDNGUOIDUNG, @TENBANG, @IDDULIEU, @HANHDONG, GETDATE())
-    `);
+  try {
+    await pool
+      .request()
+      .input("IDNGUOIDUNG", sql.BigInt, userId || null)
+      .input("TENBANG", sql.NVarChar(50), tableName)
+      .input("IDDULIEU", sql.BigInt, Number(dataId))
+      .input("HANHDONG", sql.NVarChar(20), action).query(`
+        -- Use UTC time so clients can reliably convert to local time
+        INSERT INTO NHATKY (IDNGUOIDUNG, TENBANG, IDDULIEU, HANHDONG, THOIGIAN)
+        VALUES (@IDNGUOIDUNG, @TENBANG, @IDDULIEU, @HANHDONG, GETUTCDATE())
+      `);
+  } catch (err) {
+    // Don't throw — logging failure shouldn't break the primary request.
+    console.error(
+      "writeAuditLog failed for table",
+      tableName,
+      "dataId",
+      dataId,
+      "action",
+      action,
+      "error:",
+      err && err.message,
+    );
+  }
 }
 
 const getUsers = asyncHandler(async (req, res) => {
@@ -266,29 +281,46 @@ const createUser = asyncHandler(async (req, res) => {
   const pool = await getPool();
   const roleId = await resolveRoleId(pool, role);
 
-  const insertResult = await pool
+  // Check for existing username to return a friendly 409 instead of DB error
+  const existingUser = await pool
     .request()
     .input("TENDANGNHAP", sql.VarChar(100), String(username).trim())
-    .input("MATKHAU", sql.NVarChar(255), String(password))
-    .input("HOTEN", sql.NVarChar(100), fullName || null)
-    .input("EMAIL", sql.VarChar(100), email || null)
-    .input("IDVAITRO", sql.BigInt, roleId)
-    .input("TRANGTHAI", sql.NVarChar(30), status || "Đang hoạt động").query(`
-      DECLARE @SALT VARBINARY(16) = CRYPT_GEN_RANDOM(16);
-      DECLARE @HASHEDPW NVARCHAR(255) = CONVERT(
-        NVARCHAR(255),
-        CONVERT(
-          VARBINARY(MAX),
-          HASHBYTES('SHA2_256', @MATKHAU + CONVERT(VARCHAR(MAX), @SALT))
-        ),
-        2
-      );
+    .query(
+      `SELECT TOP 1 IDNGUOIDUNG FROM NGUOIDUNG WHERE UPPER(TENDANGNHAP) = UPPER(@TENDANGNHAP)`,
+    );
 
-      INSERT INTO NGUOIDUNG (TENDANGNHAP, MATKHAU, HOTEN, EMAIL, IDVAITRO, TRANGTHAI, SALT, NGAYTAO)
-      VALUES (@TENDANGNHAP, @HASHEDPW, @HOTEN, @EMAIL, @IDVAITRO, @TRANGTHAI, @SALT, GETDATE());
+  if (existingUser.recordset[0]) {
+    throw conflict("Username already exists");
+  }
 
-      SELECT CAST(SCOPE_IDENTITY() AS BIGINT) AS IDNGUOIDUNG;
-    `);
+  let insertResult;
+  try {
+    insertResult = await pool
+      .request()
+      .input("TENDANGNHAP", sql.VarChar(100), String(username).trim())
+      .input("MATKHAU", sql.NVarChar(255), String(password))
+      .input("HOTEN", sql.NVarChar(100), fullName || null)
+      .input("EMAIL", sql.VarChar(100), email || null)
+      .input("IDVAITRO", sql.BigInt, roleId)
+      .input("TRANGTHAI", sql.NVarChar(30), status || "Đang hoạt động").query(`
+        DECLARE @SALT VARBINARY(16) = CRYPT_GEN_RANDOM(16);
+        DECLARE @HASHEDPW VARBINARY(64);
+
+        -- Hash the provided password together with the salt and keep as VARBINARY
+        SELECT @HASHEDPW = HASHBYTES('SHA2_256', CONVERT(VARCHAR(MAX), @MATKHAU) + CONVERT(VARCHAR(MAX), @SALT));
+
+        INSERT INTO NGUOIDUNG (TENDANGNHAP, MATKHAU, HOTEN, EMAIL, IDVAITRO, TRANGTHAI, SALT, NGAYTAO)
+        VALUES (@TENDANGNHAP, @HASHEDPW, @HOTEN, @EMAIL, @IDVAITRO, @TRANGTHAI, @SALT, GETDATE());
+
+        SELECT CAST(SCOPE_IDENTITY() AS BIGINT) AS IDNGUOIDUNG;
+      `);
+  } catch (err) {
+    // SQL Server duplicate key errors: 2627 or 2601
+    if (err && (err.number === 2627 || err.number === 2601)) {
+      throw conflict("Username already exists");
+    }
+    throw err;
+  }
 
   await writeAuditLog(
     pool,
@@ -358,6 +390,12 @@ const deleteUser = asyncHandler(async (req, res) => {
   const pool = await getPool();
 
   try {
+    console.log(
+      "deleteUser: attempting delete IDNGUOIDUNG=",
+      userId,
+      "by",
+      req.user?.id,
+    );
     const deleteResult = await pool
       .request()
       .input("IDNGUOIDUNG", sql.BigInt, userId)
@@ -368,12 +406,40 @@ const deleteUser = asyncHandler(async (req, res) => {
     if (!deleteResult.recordset[0].AFFECTED) {
       throw notFound("User not found");
     }
-
+    console.log(
+      "deleteUser: delete affected=",
+      deleteResult.recordset[0].AFFECTED,
+      "attempting audit write",
+    );
     await writeAuditLog(pool, req.user?.id, "NGUOIDUNG", userId, "HUY");
+    console.log("deleteUser: audit write attempted for NGUOIDUNG", userId);
 
     return success(res, null, "User deleted");
   } catch (error) {
     if (error.statusCode) {
+      // Log the failed delete attempt before rethrowing
+      try {
+        console.log(
+          "deleteUser: write HUY_THAT_BAI for",
+          userId,
+          "because of statusCode error",
+          error.statusCode,
+        );
+        await writeAuditLog(
+          pool,
+          req.user?.id,
+          "NGUOIDUNG",
+          userId,
+          "HUY_THAT_BAI",
+        );
+        console.log(
+          "deleteUser: attempted HUY_THAT_BAI audit write for",
+          userId,
+        );
+      } catch (logErr) {
+        console.error("Audit log failed:", logErr && logErr.message);
+      }
+
       throw error;
     }
 
@@ -419,12 +485,24 @@ const createInsuranceType = asyncHandler(async (req, res) => {
       SELECT CAST(SCOPE_IDENTITY() AS BIGINT) AS IDLOAI;
     `);
 
+  // Trace creation and audit write for debugging missing logs
+  console.log(
+    "createInsuranceType: created IDLOAI=",
+    result.recordset[0].IDLOAI,
+    "by user",
+    req.user?.id,
+  );
   await writeAuditLog(
     pool,
     req.user?.id,
     "LOAIBAOHIEM",
     result.recordset[0].IDLOAI,
     "THEM",
+  );
+
+  console.log(
+    "createInsuranceType: audit write attempted for IDLOAI=",
+    result.recordset[0].IDLOAI,
   );
 
   return success(
@@ -710,6 +788,7 @@ const deleteContract = asyncHandler(async (req, res) => {
 });
 
 const getActivityFeed = asyncHandler(async (req, res) => {
+  console.log("[getActivityFeed] Fetching activity from NHATKY table...");
   const pool = await getPool();
   const result = await pool.request().query(`
     SELECT TOP (50)
@@ -719,8 +798,29 @@ const getActivityFeed = asyncHandler(async (req, res) => {
         WHEN 'SUA' THEN N'updated'
         WHEN 'HUY' THEN N'deleted'
         WHEN 'XACNHANTHANHTOAN' THEN N'confirmed'
+        WHEN 'HUYXACNHANTHANHTOAN' THEN N'canceled'
         ELSE LOWER(NK.HANHDONG)
       END AS EVENT_KIND,
+      -- Localized action label (verb + entity) to avoid client-side mis-mapping
+      CONCAT(
+        CASE UPPER(NK.HANHDONG)
+          WHEN 'THEM' THEN N'Tạo'
+          WHEN 'SUA' THEN N'Cập nhật'
+          WHEN 'HUY' THEN N'Xóa'
+          WHEN 'XACNHANTHANHTOAN' THEN N'Xác nhận'
+          WHEN 'HUYXACNHANTHANHTOAN' THEN N'Hủy xác nhận'
+          ELSE NK.HANHDONG
+        END,
+        N' ',
+        CASE UPPER(NK.TENBANG)
+          WHEN 'HOPDONG' THEN N'hợp đồng'
+          WHEN 'THANHTOAN' THEN N'thanh toán'
+          WHEN 'NGUOIDUNG' THEN N'người dùng'
+          WHEN 'LOAIBAOHIEM' THEN N'loại bảo hiểm'
+          WHEN 'PHANCONG' THEN N'phân công'
+          ELSE NK.TENBANG
+        END
+      ) AS ACTION_LABEL,
       NK.IDDULIEU AS ENTITY_ID,
       CASE UPPER(NK.TENBANG)
         WHEN 'HOPDONG' THEN ISNULL(H.SOHOPDONG, CONCAT('Contract #', NK.IDDULIEU))
@@ -746,7 +846,10 @@ const getActivityFeed = asyncHandler(async (req, res) => {
         WHEN 'PHANCONG' THEN CONCAT(ISNULL(LBP.TENLOAI, CONCAT('Type #', NK.IDDULIEU)), N' / ', ISNULL(P.LOAIPHANCONG, N''))
         ELSE NULL
       END AS DETAIL,
-      NK.THOIGIAN AS EVENT_AT,
+      -- Return ISO8601 UTC timestamp so frontend can convert to user's local time
+      -- both UTC and local (SE Asia) timestamps
+      CONVERT(varchar(33), NK.THOIGIAN AT TIME ZONE 'UTC', 127) AS EVENT_AT_UTC,
+      CONVERT(varchar(33), (NK.THOIGIAN AT TIME ZONE 'UTC') AT TIME ZONE 'SE Asia Standard Time', 127) AS EVENT_AT_LOCAL,
       CASE UPPER(NK.TENBANG)
         WHEN 'HOPDONG' THEN H.TRANGTHAI
         WHEN 'THANHTOAN' THEN T.TRANGTHAI
@@ -776,6 +879,7 @@ const getActivityFeed = asyncHandler(async (req, res) => {
     ORDER BY NK.THOIGIAN DESC, NK.IDNHATKY DESC
   `);
 
+  console.log(`[getActivityFeed] ✓ Returned ${result.recordset.length} activity records`);
   return success(res, result.recordset, "Activity feed fetched");
 });
 

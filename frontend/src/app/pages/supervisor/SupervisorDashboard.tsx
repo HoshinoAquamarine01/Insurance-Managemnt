@@ -269,46 +269,7 @@ export function SupervisorDashboard() {
           </CardContent>
         </Card>
 
-        {/* Insurance Type Distribution */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#7c3aed]" />
-              Loại bảo hiểm
-            </CardTitle>
-            <CardDescription>Số lượng hợp đồng theo loại</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="h-80 bg-muted rounded-lg" />
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={insuranceTypeData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="type" stroke="var(--muted-foreground)" />
-                  <YAxis
-                    stroke="var(--muted-foreground)"
-                    type="number"
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--card)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value) => `${value} hợp đồng`}
-                  />
-                  <Bar
-                    dataKey="count"
-                    fill="var(--role-supervisor)"
-                    radius={[8, 8, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+        {/* Insurance Type Distribution removed per request */}
       </div>
 
       {/* Quick Actions */}

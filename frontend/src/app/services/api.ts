@@ -48,6 +48,7 @@ export async function apiRequest<T>(
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    cache: options.cache ?? "no-store",
     headers,
   });
 
@@ -136,6 +137,16 @@ export async function confirmAccountingPayment(
   role: string,
 ) {
   return apiRequest<any>(`/payments/${paymentId}/confirm`, {
+    method: "PUT",
+    role,
+  });
+}
+
+export async function cancelAccountingPayment(
+  paymentId: string | number,
+  role: string,
+) {
+  return apiRequest<any>(`/payments/${paymentId}/cancel`, {
     method: "PUT",
     role,
   });

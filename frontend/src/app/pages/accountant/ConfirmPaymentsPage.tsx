@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { CheckCircle2, DollarSign, Search, ArrowLeft } from "lucide-react";
+import { CheckCircle2, DollarSign, Search, ArrowLeft, X } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-import { confirmAccountingPayment, getPayments } from "../../services/api";
+import {
+  cancelAccountingPayment,
+  confirmAccountingPayment,
+  getPayments,
+} from "../../services/api";
 import {
   Card,
   CardContent,
@@ -24,6 +28,14 @@ import {
 } from "../../components/ui/table";
 
 function isAccountantConfirmed(payment: any) {
+  const paymentStatus = String(
+    payment?.TRANGTHAI_THANHTOAN || payment?.TRANGTHAI || "",
+  ).toLowerCase();
+
+  if (paymentStatus.includes("hủy") || paymentStatus.includes("huy")) {
+    return false;
+  }
+
   const confirmerId = Number(payment?.NGUOIXACNHAN);
   if (Number.isInteger(confirmerId) && confirmerId > 0) {
     return true;
@@ -34,14 +46,23 @@ function isAccountantConfirmed(payment: any) {
     return true;
   }
 
+  return (
+    paymentStatus.includes("đã xác nhận") ||
+    paymentStatus.includes("da xac nhan") ||
+    paymentStatus.includes("confirmed")
+  );
+}
+
+function isAccountantCancelled(payment: any) {
   const paymentStatus = String(
     payment?.TRANGTHAI_THANHTOAN || payment?.TRANGTHAI || "",
   ).toLowerCase();
 
   return (
-    paymentStatus.includes("đã xác nhận") ||
-    paymentStatus.includes("da xac nhan") ||
-    paymentStatus.includes("confirmed")
+    paymentStatus.includes("đã hủy") ||
+    paymentStatus.includes("da huy") ||
+    paymentStatus.includes("hủy") ||
+    paymentStatus.includes("huy")
   );
 }
 
@@ -57,6 +78,13 @@ function getPaymentConfirmationState(payment: any) {
     return {
       label: "Đã xác nhận",
       tone: "bg-status-active/10 text-status-active",
+    };
+  }
+
+  if (isAccountantCancelled(payment)) {
+    return {
+      label: "Đã hủy",
+      tone: "bg-status-expired/10 text-status-expired",
     };
   }
 
@@ -103,7 +131,10 @@ export function ConfirmPaymentsPage() {
 
   const pendingPayments = useMemo(() => {
     return payments.filter(
-      (payment) => payment.IDTHANHTOAN && !isAccountantConfirmed(payment),
+      (payment) =>
+        payment.IDTHANHTOAN &&
+        !isAccountantConfirmed(payment) &&
+        !isAccountantCancelled(payment),
     );
   }, [payments]);
 
@@ -151,6 +182,33 @@ export function ConfirmPaymentsPage() {
         error instanceof Error
           ? error.message
           : "Không xác nhận được thanh toán",
+      );
+    } finally {
+      setConfirmingPaymentId(null);
+    }
+  }
+
+  async function handleCancelPayment(payment: any) {
+    if (!user) return;
+
+    const paymentId = Number(payment.IDTHANHTOAN);
+    if (!Number.isInteger(paymentId) || paymentId <= 0) return;
+
+    const confirmed = window.confirm(
+      `Hủy thanh toán kỳ ${payment.SOKY || payment.IDKY}?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setConfirmingPaymentId(paymentId);
+      setNotice("");
+      await cancelAccountingPayment(paymentId, user.role);
+      const refreshedPayments = await getPayments(user.role);
+      setPayments(refreshedPayments);
+      setNotice(`Đã hủy thanh toán kỳ ${payment.SOKY || payment.IDKY}.`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Không hủy được thanh toán",
       );
     } finally {
       setConfirmingPaymentId(null);
@@ -241,7 +299,7 @@ export function ConfirmPaymentsPage() {
                 <TableHead>Ngày thanh toán</TableHead>
                 <TableHead>Số tiền</TableHead>
                 <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Xác nhận</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -295,19 +353,35 @@ export function ConfirmPaymentsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          className="gap-2"
-                          disabled={
-                            confirmingPaymentId === Number(payment.IDTHANHTOAN)
-                          }
-                          onClick={() => handleConfirmPayment(payment)}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          {confirmingPaymentId === Number(payment.IDTHANHTOAN)
-                            ? "Đang xác nhận..."
-                            : "Xác nhận"}
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            className="gap-2"
+                            disabled={
+                              confirmingPaymentId ===
+                              Number(payment.IDTHANHTOAN)
+                            }
+                            onClick={() => handleConfirmPayment(payment)}
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            {confirmingPaymentId === Number(payment.IDTHANHTOAN)
+                              ? "Đang xử lý..."
+                              : "Xác nhận"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="gap-2"
+                            disabled={
+                              confirmingPaymentId ===
+                              Number(payment.IDTHANHTOAN)
+                            }
+                            onClick={() => handleCancelPayment(payment)}
+                          >
+                            <X className="w-4 h-4" />
+                            Hủy xác nhận
+                          </Button>
+                        </div>
                       </TableCell>
                     </motion.tr>
                   );

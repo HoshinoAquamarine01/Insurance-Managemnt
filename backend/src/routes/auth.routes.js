@@ -12,11 +12,8 @@ const router = express.Router();
 
 router.post("/login", loginRules, validateRequest, login);
 router.put("/profile/update", updateProfile);
-router.put(
-  "/password/update",
-  updatePasswordRules,
-  validateRequest,
-  updatePassword,
-);
+// Support legacy/frontend path: PUT /api/auth/profile
+router.put("/profile", updateProfile);
+router.put("/password", updatePasswordRules, validateRequest, updatePassword);
 
 module.exports = router;

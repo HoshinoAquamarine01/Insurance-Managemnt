@@ -38,29 +38,18 @@ function getPaymentAmount(payment: any) {
 }
 
 function isAccountantConfirmed(payment: any) {
-  const confirmerId = Number(payment?.NGUOIXACNHAN);
-  if (Number.isInteger(confirmerId) && confirmerId > 0) {
-    return true;
-  }
-
-  const confirmedAt = String(payment?.NGAYXACNHAN || "").trim();
-  if (confirmedAt) {
-    return true;
-  }
-
   const paymentStatus = String(
     payment?.TRANGTHAI_THANHTOAN || payment?.TRANGTHAI || "",
   ).toLowerCase();
 
-  return (
-    paymentStatus.includes("đã xác nhận") ||
-    paymentStatus.includes("da xac nhan") ||
-    paymentStatus.includes("confirmed")
-  );
+  return paymentStatus.includes("đã đóng") || paymentStatus.includes("da dong");
 }
 
 function hasPaymentRecord(payment: any) {
-  return Boolean(payment?.IDTHANHTOAN);
+  // Only consider as paid when accountant has confirmed or status indicates paid.
+  if (payment?.NGUOIXACNHAN) return true;
+  const status = String(payment?.TRANGTHAI || "").toLowerCase();
+  return status.includes("đã") || status.includes("da");
 }
 
 function getPaymentStatusLabel(payment: any) {
@@ -69,10 +58,10 @@ function getPaymentStatusLabel(payment: any) {
   }
 
   if (isAccountantConfirmed(payment)) {
-    return "Đã xác nhận";
+    return "Đã đóng";
   }
 
-  return "Chờ kế toán xác nhận";
+  return "Chưa cập nhật";
 }
 
 function getPaymentStatusTone(payment: any) {
@@ -84,7 +73,7 @@ function getPaymentStatusTone(payment: any) {
     return "bg-status-active/10 text-status-active";
   }
 
-  return "bg-status-pending/10 text-status-pending";
+  return "bg-neutral-100 text-neutral-800";
 }
 
 function normalizeText(value: unknown) {

@@ -124,7 +124,7 @@ async function confirmInstallmentPayment({
 
   await pool.request().input("IDKY", sql.BigInt, idKy).query(`
       UPDATE KYDONGPHI
-      SET TRANGTHAI = N'Đã đóng',
+      SET TRANGTHAI = N'Chờ kế toán xác nhận',
           NGAYCAPNHAT = GETDATE()
       WHERE IDKY = @IDKY
     `);
@@ -190,12 +190,70 @@ async function confirmPaymentByAccountant({ paymentId, accountantId }) {
   return { alreadyConfirmed: false };
 }
 
+async function cancelPaymentByAccountant({ paymentId, accountantId }) {
+  const pool = await getPool();
+
+  const paymentResult = await pool
+    .request()
+    .input("IDTHANHTOAN", sql.BigInt, paymentId).query(`
+      SELECT TOP 1
+        T.IDTHANHTOAN,
+        T.IDKY,
+        T.TRANGTHAI
+      FROM THANHTOAN T
+      WHERE T.IDTHANHTOAN = @IDTHANHTOAN
+    `);
+
+  const payment = paymentResult.recordset[0];
+  if (!payment) {
+    const error = new Error("Payment not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const normalizedStatus = normalizePaidStatus(payment.TRANGTHAI);
+  if (normalizedStatus.includes("hủy") || normalizedStatus.includes("huy")) {
+    return { alreadyCancelled: true };
+  }
+
+  const wasConfirmed = normalizedStatus.includes("xác nhận");
+  const cancelNote = wasConfirmed
+    ? "Kế toán hủy xác nhận thanh toán"
+    : "Kế toán hủy thanh toán";
+
+  await pool
+    .request()
+    .input("IDTHANHTOAN", sql.BigInt, paymentId)
+    .input("NGUOIXACNHAN", sql.BigInt, accountantId)
+    .input("NGAYXACNHAN", sql.DateTime, new Date())
+    .input("TRANGTHAI", sql.NVarChar(20), "Đã hủy")
+    .input("GHICHU", sql.NVarChar(300), cancelNote).query(`
+      UPDATE THANHTOAN
+      SET NGUOIXACNHAN = @NGUOIXACNHAN,
+          NGAYXACNHAN = @NGAYXACNHAN,
+          TRANGTHAI = @TRANGTHAI,
+          GHICHU = COALESCE(@GHICHU, GHICHU)
+      WHERE IDTHANHTOAN = @IDTHANHTOAN
+    `);
+
+  await pool.request().input("IDKY", sql.BigInt, payment.IDKY).query(`
+      UPDATE KYDONGPHI
+      SET TRANGTHAI = N'Chưa đóng',
+          NGAYCAPNHAT = GETDATE()
+      WHERE IDKY = @IDKY
+    `);
+
+  return { alreadyCancelled: false };
+}
+
 async function createPendingInstallmentPayment({
   idKy,
   insuredUserId,
   amount,
   gatewayRef,
   method,
+  description,
+  setPaidDate = true,
 }) {
   const pool = await getPool();
   const installment = await getInstallmentByIdForInsured(idKy, insuredUserId);
@@ -229,17 +287,19 @@ async function createPendingInstallmentPayment({
     }
   }
 
+  const ngayanThanhToanValue = setPaidDate ? new Date() : null;
+
   await pool
     .request()
     .input("IDKY", sql.BigInt, idKy)
-    .input("NGAYTHANHTOAN", sql.DateTime, new Date())
+    .input("NGAYTHANHTOAN", sql.DateTime, ngayanThanhToanValue)
     .input("SOTIEN", sql.Decimal(18, 2), amount)
     .input("PHUONGTHUC", sql.NVarChar(50), method || "SePay")
     .input("MACHUNGTU", sql.VarChar(100), gatewayRef || null)
     .input("TRANGTHAI", sql.NVarChar(20), "Chờ kế toán xác nhận")
     .input("NGUOIXACNHAN", sql.BigInt, null)
     .input("NGAYXACNHAN", sql.DateTime, null)
-    .input("GHICHU", sql.NVarChar(300), null).query(`
+    .input("GHICHU", sql.NVarChar(300), description || null).query(`
       INSERT INTO THANHTOAN (
         IDKY, NGAYTHANHTOAN, SOTIEN, PHUONGTHUC,
         MACHUNGTU, TRANGTHAI, NGUOIXACNHAN, NGAYXACNHAN, GHICHU
@@ -253,10 +313,140 @@ async function createPendingInstallmentPayment({
   return { payment: await getInstallmentByIdForInsured(idKy, insuredUserId) };
 }
 
+async function createUnmatchedPayment({ amount, gatewayRef, method, note }) {
+  const pool = await getPool();
+
+  await pool
+    .request()
+    .input("NGAYTHANHTOAN", sql.DateTime, new Date())
+    .input("SOTIEN", sql.Decimal(18, 2), amount)
+    .input("PHUONGTHUC", sql.NVarChar(50), method || "SePay")
+    .input("MACHUNGTU", sql.VarChar(100), gatewayRef || null)
+    .input("TRANGTHAI", sql.NVarChar(20), "Chờ kế toán xác nhận")
+    .input("NGUOIXACNHAN", sql.BigInt, null)
+    .input("NGAYXACNHAN", sql.DateTime, null)
+    .input("GHICHU", sql.NVarChar(300), note || null).query(`
+      INSERT INTO THANHTOAN (
+        IDKY, NGAYTHANHTOAN, SOTIEN, PHUONGTHUC,
+        MACHUNGTU, TRANGTHAI, NGUOIXACNHAN, NGAYXACNHAN, GHICHU
+      )
+      VALUES (
+        NULL, @NGAYTHANHTOAN, @SOTIEN, @PHUONGTHUC,
+        @MACHUNGTU, @TRANGTHAI, @NGUOIXACNHAN, @NGAYXACNHAN, @GHICHU
+      )
+    `);
+
+  return { recorded: true };
+}
+
+async function createSePayCheckoutRecord({
+  orderRef,
+  idKy,
+  insuredUserId,
+  amount,
+  gatewayOrderId,
+}) {
+  const pool = await getPool();
+
+  await pool.request().query(`
+    IF OBJECT_ID(N'dbo.SEPAY_CHECKOUTS', N'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.SEPAY_CHECKOUTS (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        ORDER_REF VARCHAR(200) NOT NULL,
+        IDKY BIGINT NULL,
+        IDNGUOIDUNG BIGINT NULL,
+        AMOUNT DECIMAL(18,2) NOT NULL,
+        GATEWAY_ORDER_ID VARCHAR(200) NULL,
+        MATCHED BIT DEFAULT 0,
+        CREATED_AT DATETIME NOT NULL
+      );
+    END
+  `);
+
+  await pool
+    .request()
+    .input("ORDER_REF", sql.VarChar(200), String(orderRef || "").trim())
+    .input("IDKY", sql.BigInt, idKy || null)
+    .input("IDNGUOIDUNG", sql.BigInt, insuredUserId || null)
+    .input("AMOUNT", sql.Decimal(18, 2), amount || 0)
+    .input("GATEWAY_ORDER_ID", sql.VarChar(200), gatewayOrderId || null)
+    .input("CREATED_AT", sql.DateTime, new Date()).query(`
+      INSERT INTO dbo.SEPAY_CHECKOUTS (
+        ORDER_REF, IDKY, IDNGUOIDUNG, AMOUNT, GATEWAY_ORDER_ID, CREATED_AT
+      ) VALUES (
+        @ORDER_REF, @IDKY, @IDNGUOIDUNG, @AMOUNT, @GATEWAY_ORDER_ID, @CREATED_AT
+      )
+    `);
+
+  return { recorded: true };
+}
+
+async function findSePayCheckoutByAmount(amount) {
+  const pool = await getPool();
+  const normalizedAmount = Math.round(Number(amount || 0));
+  if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+    return null;
+  }
+
+  const result = await pool
+    .request()
+    .input("AMOUNT", sql.Decimal(18, 2), normalizedAmount).query(`
+      SELECT TOP 1 ORDER_REF, IDKY, IDNGUOIDUNG, AMOUNT
+      FROM dbo.SEPAY_CHECKOUTS
+      WHERE AMOUNT = @AMOUNT
+        AND (MATCHED = 0 OR MATCHED IS NULL)
+        AND CREATED_AT >= DATEADD(DAY, -7, GETDATE())
+      ORDER BY CREATED_AT DESC
+    `);
+
+  return result.recordset[0] || null;
+}
+
+async function findSePayCheckoutByGatewayOrderId(gatewayOrderId) {
+  const pool = await getPool();
+  const normalizedId = String(gatewayOrderId || "").trim();
+  if (!normalizedId) {
+    return null;
+  }
+
+  const result = await pool.request().input("GATEWAY_ORDER_ID", normalizedId)
+    .query(`
+      SELECT TOP 1 ORDER_REF, IDKY, IDNGUOIDUNG, AMOUNT, GATEWAY_ORDER_ID
+      FROM dbo.SEPAY_CHECKOUTS
+      WHERE GATEWAY_ORDER_ID = @GATEWAY_ORDER_ID
+        AND CREATED_AT >= DATEADD(DAY, -7, GETDATE())
+      ORDER BY CREATED_AT DESC
+    `);
+
+  return result.recordset[0] || null;
+}
+
+async function markSePayCheckoutMatched({ orderRef, id }) {
+  const pool = await getPool();
+  if (orderRef) {
+    await pool
+      .request()
+      .input("ORDER_REF", sql.VarChar(200), String(orderRef).trim()).query(`
+        UPDATE dbo.SEPAY_CHECKOUTS
+        SET MATCHED = 1
+        WHERE ORDER_REF = @ORDER_REF
+      `);
+    return;
+  }
+
+  if (id) {
+    await pool.request().input("ID", sql.Int, id).query(`
+        UPDATE dbo.SEPAY_CHECKOUTS
+        SET MATCHED = 1
+        WHERE ID = @ID
+      `);
+  }
+}
+
 async function getAllPayments(user) {
   const pool = await getPool();
 
-  // Get scoped insurance type IDs if user has a scoped role
   const assignedTypeIds = await getAssignedInsuranceTypeIds(
     pool,
     user?.id,
@@ -353,5 +543,10 @@ module.exports = {
   getInstallmentByIdForInsured,
   confirmInstallmentPayment,
   confirmPaymentByAccountant,
+  cancelPaymentByAccountant,
   createPendingInstallmentPayment,
+  createUnmatchedPayment,
+  createSePayCheckoutRecord,
+  findSePayCheckoutByAmount,
+  markSePayCheckoutMatched,
 };

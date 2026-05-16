@@ -25,6 +25,7 @@ import {
   TrendingDown,
   CheckCircle2,
   Clock3,
+  X,
 } from "lucide-react";
 import {
   BarChart,
@@ -39,12 +40,21 @@ import { motion } from "motion/react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import {
+  cancelAccountingPayment,
   confirmAccountingPayment,
   getDashboardSummary,
   getPayments,
 } from "../../services/api";
 
 function isAccountantConfirmed(payment: any) {
+  const paymentStatus = String(
+    payment?.TRANGTHAI_THANHTOAN || payment?.TRANGTHAI || "",
+  ).toLowerCase();
+
+  if (paymentStatus.includes("hủy") || paymentStatus.includes("huy")) {
+    return false;
+  }
+
   const confirmerId = Number(payment?.NGUOIXACNHAN);
   if (Number.isInteger(confirmerId) && confirmerId > 0) {
     return true;
@@ -55,14 +65,23 @@ function isAccountantConfirmed(payment: any) {
     return true;
   }
 
+  return (
+    paymentStatus.includes("đã xác nhận") ||
+    paymentStatus.includes("da xac nhan") ||
+    paymentStatus.includes("confirmed")
+  );
+}
+
+function isAccountantCancelled(payment: any) {
   const paymentStatus = String(
     payment?.TRANGTHAI_THANHTOAN || payment?.TRANGTHAI || "",
   ).toLowerCase();
 
   return (
-    paymentStatus.includes("đã xác nhận") ||
-    paymentStatus.includes("da xac nhan") ||
-    paymentStatus.includes("confirmed")
+    paymentStatus.includes("đã hủy") ||
+    paymentStatus.includes("da huy") ||
+    paymentStatus.includes("hủy") ||
+    paymentStatus.includes("huy")
   );
 }
 
@@ -78,6 +97,13 @@ function getPaymentConfirmationState(payment: any) {
     return {
       label: "Đã xác nhận",
       tone: "bg-status-active/10 text-status-active",
+    };
+  }
+
+  if (isAccountantCancelled(payment)) {
+    return {
+      label: "Đã hủy",
+      tone: "bg-status-expired/10 text-status-expired",
     };
   }
 
@@ -279,7 +305,10 @@ export function AccountantDashboard() {
   const pendingPayments = useMemo(
     () =>
       payments.filter(
-        (payment) => payment.IDTHANHTOAN && !isAccountantConfirmed(payment),
+        (payment) =>
+          payment.IDTHANHTOAN &&
+          !isAccountantConfirmed(payment) &&
+          !isAccountantCancelled(payment),
       ),
     [payments],
   );
@@ -334,6 +363,33 @@ export function AccountantDashboard() {
     }
   }
 
+  async function handleCancelPayment(payment: any) {
+    if (!user) return;
+
+    const paymentId = Number(payment.IDTHANHTOAN);
+    if (!Number.isInteger(paymentId) || paymentId <= 0) return;
+
+    const confirmed = window.confirm(
+      `Hủy thanh toán kỳ ${payment.SOKY || payment.IDKY}?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setConfirmingPaymentId(paymentId);
+      setNotice("");
+      await cancelAccountingPayment(paymentId, user.role);
+      const refreshedPayments = await getPayments(user.role);
+      setPayments(refreshedPayments);
+      setNotice(`Đã hủy thanh toán kỳ ${payment.SOKY || payment.IDKY}.`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Không hủy được thanh toán",
+      );
+    } finally {
+      setConfirmingPaymentId(null);
+    }
+  }
+
   function handleExportFinancialData() {
     const fileDate = new Date().toISOString().slice(0, 10);
     const csv = buildAccountantExportCsv(summary, payments);
@@ -359,10 +415,35 @@ export function AccountantDashboard() {
             <p className="mt-2 text-sm text-muted-foreground">{notice}</p>
           ) : null}
         </div>
-        <Button className="gap-2" onClick={handleExportFinancialData}>
-          <Download className="w-4 h-4" />
-          Xuất báo cáo
-        </Button>
+        <div className="flex gap-2">
+          <Button className="gap-2" onClick={handleExportFinancialData}>
+            <Download className="w-4 h-4" />
+            Xuất CSV
+          </Button>
+          <Button
+            className="gap-2"
+            variant="secondary"
+            onClick={() => {
+              // Export CSV but download with .xls and Excel MIME type for direct open in Excel
+              const fileDate = new Date().toISOString().slice(0, 10);
+              const csv = buildAccountantExportCsv(summary, payments);
+              const blob = new Blob(["\ufeff", csv], {
+                type: "application/vnd.ms-excel",
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `accountant-financial-report-${fileDate}.xls`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download className="w-4 h-4" />
+            Xuất Excel
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -437,7 +518,7 @@ export function AccountantDashboard() {
                 <TableHead>Ngày thanh toán</TableHead>
                 <TableHead>Số tiền</TableHead>
                 <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Xác nhận</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -484,20 +565,36 @@ export function AccountantDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            className="gap-2"
-                            disabled={
-                              confirmingPaymentId ===
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              className="gap-2"
+                              disabled={
+                                confirmingPaymentId ===
+                                Number(payment.IDTHANHTOAN)
+                              }
+                              onClick={() => handleConfirmPayment(payment)}
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              {confirmingPaymentId ===
                               Number(payment.IDTHANHTOAN)
-                            }
-                            onClick={() => handleConfirmPayment(payment)}
-                          >
-                            <CheckCircle2 className="w-4 h-4" />
-                            {confirmingPaymentId === Number(payment.IDTHANHTOAN)
-                              ? "Đang xác nhận..."
-                              : "Xác nhận"}
-                          </Button>
+                                ? "Đang xử lý..."
+                                : "Xác nhận"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="gap-2"
+                              disabled={
+                                confirmingPaymentId ===
+                                Number(payment.IDTHANHTOAN)
+                              }
+                              onClick={() => handleCancelPayment(payment)}
+                            >
+                              <X className="w-4 h-4" />
+                              Hủy xác nhận
+                            </Button>
+                          </div>
                         </TableCell>
                       </motion.tr>
                     );
@@ -508,35 +605,7 @@ export function AccountantDashboard() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Xu hướng dòng tiền theo tháng</CardTitle>
-          <CardDescription>
-            So sánh theo tháng dựa trên dữ liệu thanh toán
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" stroke="var(--muted-foreground)" />
-              <YAxis stroke="var(--muted-foreground)" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "8px",
-                }}
-              />
-              <Bar
-                dataKey="revenue"
-                fill="var(--role-accountant)"
-                radius={[8, 8, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      {/* Cash-flow chart removed per request */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>

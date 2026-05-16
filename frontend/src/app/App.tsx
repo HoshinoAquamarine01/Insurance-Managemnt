@@ -2,38 +2,36 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import { AppLayout } from "./components/layout/AppLayout";
 
-// Public Pages
+
 import { HomePage } from "./pages/shared/HomePage";
 
-// Auth Pages
-import { LoginPage } from "./pages/auth/LoginPage.tsx";
-import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage.tsx";
 
-// Creator Pages
+import { LoginPage } from "./pages/auth/LoginPage.tsx";
+
+
+
 import { CreatorDashboard } from "./pages/creator/CreatorDashboard.tsx";
 import { CreateContractPage } from "./pages/creator/CreateContractPage.tsx";
 import { ContractsListPage } from "./pages/creator/ContractsListPage.tsx";
 import { CreateInsuredPage } from "./pages/creator/CreateInsuredPage.tsx";
 
-// Insured Pages
+
 import { InsuredDashboard } from "./pages/insured/InsuredDashboard.tsx";
 import { InstallmentPaymentPage } from "./pages/insured/InstallmentPaymentPage.tsx";
 import { PaymentSuccessPage } from "./pages/insured/PaymentSuccessPage.tsx";
 import { PaymentHistoryPage } from "./pages/insured/PaymentHistoryPage.tsx";
 import { InsuranceStatusPage } from "./pages/insured/InsuranceStatusPage.tsx";
 
-// Accountant Pages
 import { AccountantDashboard } from "./pages/accountant/AccountantDashboard.tsx";
 import { ConfirmPaymentsPage } from "./pages/accountant/ConfirmPaymentsPage.tsx";
 import { ReportsPage } from "./pages/accountant/ReportsPage.tsx";
 
-// Supervisor Pages
+
 import { SupervisorDashboard } from "./pages/supervisor/SupervisorDashboard.tsx";
 
-// Admin Pages
 import { AdminDashboard } from "./pages/admin/AdminDashboard.tsx";
 
-// Shared Pages
+
 import { ProfilePage } from "./pages/shared/ProfilePage.tsx";
 import { SettingsPage } from "./pages/shared/SettingsPage.tsx";
 
@@ -89,11 +87,11 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
 
-      {/* Auth Routes */}
+    
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+     
 
-      {/* Protected Layout Routes - all nested routes render inside AppLayout via Outlet */}
+    
       <Route
         element={
           <ProtectedRoute>
@@ -104,7 +102,7 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardRouter />} />
         <Route path="/profile" element={<ProfilePage />} />
 
-        {/* Creator Routes */}
+     
         <Route
           path="/contracts/create"
           element={
@@ -133,7 +131,7 @@ export default function App() {
         />
         <Route path="/contracts/history" element={<ContractsListPage />} />
 
-        {/* Insured Routes */}
+       
         <Route path="/my-contract" element={<InsuredDashboard />} />
         <Route path="/payments/sepay" element={<InstallmentPaymentPage />} />
         <Route path="/payments/success" element={<PaymentSuccessPage />} />
@@ -144,7 +142,7 @@ export default function App() {
         <Route path="/payments" element={<PaymentHistoryPage />} />
         <Route path="/status" element={<InsuranceStatusPage />} />
 
-        {/* Accountant Routes */}
+      
         <Route path="/reports" element={<ReportsPage />} />
         <Route
           path="/payments/confirm"
@@ -155,13 +153,13 @@ export default function App() {
           }
         />
 
-        {/* Supervisor Routes */}
+        
         <Route
           path="/contract-details"
           element={<Navigate to="/contracts" replace />}
         />
 
-        {/* Admin Routes */}
+    
         <Route
           path="/admin"
           element={
@@ -171,14 +169,14 @@ export default function App() {
           }
         />
 
-        {/* Settings */}
+       
         <Route path="/settings" element={<SettingsPage />} />
 
-        {/* Default redirect for protected routes */}
+     
         <Route path="/" element={<Navigate to="/dashboard" />} />
       </Route>
 
-      {/* Catch-all for undefined routes */}
+      
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

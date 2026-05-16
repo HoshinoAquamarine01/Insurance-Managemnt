@@ -38,27 +38,27 @@ import {
 } from "../../components/ui/table";
 
 function hasPaymentRecord(payment: any) {
-  return Boolean(payment?.IDTHANHTOAN);
-}
-
-function isAccountantConfirmed(payment: any) {
-  if (payment?.NGUOIXACNHAN) {
-    return true;
-  }
-
+  // Consider a payment record valid only if there's a transaction record
+  // that is not cancelled. A cancelled THANHTOAN (TRANGTHAI contains 'hủy')
+  // should not count as a paid record so the installment reappears as unpaid.
+  if (!payment?.IDTHANHTOAN) return false;
   const paymentStatus = String(
     payment?.TRANGTHAI_THANHTOAN || "",
   ).toLowerCase();
-  return (
-    paymentStatus.includes("kế toán xác nhận") ||
-    paymentStatus.includes("ke toan xac nhan")
-  );
+  if (paymentStatus.includes("hủy") || paymentStatus.includes("huy"))
+    return false;
+  return true;
+}
+
+function isAccountantConfirmed(payment: any) {
+  const paymentStatus = String(
+    payment?.TRANGTHAI_THANHTOAN || "",
+  ).toLowerCase();
+  return paymentStatus.includes("đã đóng") || paymentStatus.includes("da dong");
 }
 
 function isPaidStatus(payment: any) {
-  if (hasPaymentRecord(payment)) {
-    return true;
-  }
+  if (payment?.NGUOIXACNHAN) return true;
 
   const status = String(payment?.TRANGTHAI || "").toLowerCase();
   return status.includes("đã") || status.includes("da");
@@ -70,10 +70,10 @@ function getPaymentStatusLabel(payment: any) {
   }
 
   if (isAccountantConfirmed(payment)) {
-    return "Đã xác nhận";
+    return "Đã đóng";
   }
 
-  return "Chờ kế toán xác nhận";
+  return "Chưa đóng";
 }
 
 function getPaymentStatusTone(payment: any) {
@@ -85,7 +85,7 @@ function getPaymentStatusTone(payment: any) {
     return "bg-status-active/10 text-status-active";
   }
 
-  return "bg-status-pending/10 text-status-pending";
+  return "bg-neutral-100 text-neutral-800";
 }
 
 function getDueAmount(payment: any) {
@@ -120,7 +120,7 @@ function getDueDateTime(payment: any) {
 type CheckoutSessionResponse = VietQrCheckoutSessionResponse & {
   checkoutActionUrl?: string;
   checkoutFields?: Record<string, string>;
-  qrCodeUrl?: string;
+  qrImageUrl?: string;
   payUrl?: string;
   paymentUrl?: string;
   bankCode?: string;
@@ -445,7 +445,8 @@ export function InstallmentPaymentPage() {
       )) as CheckoutSessionResponse;
 
       const checkoutUrl =
-        response.qrCodeUrl ||
+        response.qrImageUrl ||
+        response.qrUrl ||
         response.payUrl ||
         response.paymentUrl ||
         response.checkoutActionUrl ||
@@ -455,12 +456,68 @@ export function InstallmentPaymentPage() {
         return;
       }
 
+      // If gateway requires a POST form to start checkout (checkoutActionUrl + checkoutFields),
+      // submit a dynamic form so the user is redirected to the gateway-hosted page.
+      if (response.checkoutActionUrl && response.checkoutFields) {
+        setSelectedIdKy(idKy);
+        setCheckoutSession({
+          sessionId: String(idKy),
+          qrUrl:
+            response.payUrl ||
+            response.qrImageUrl ||
+            response.checkoutActionUrl,
+          description: String(response.requestId || response.orderRef || idKy),
+          qrImageUrl:
+            response.qrImageUrl ||
+            response.payUrl ||
+            response.checkoutActionUrl,
+          bankCode: response.bankCode,
+          accountNumber: response.accountNumber || "",
+          accountNo: response.accountNumber,
+          accountName: response.accountName,
+          amount: response.amount,
+          transferContent: String(
+            response.requestId || response.orderRef || idKy,
+          ),
+          orderRef: response.orderRef,
+        });
+
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = response.checkoutActionUrl;
+        form.target = "_self";
+
+        const fields = { ...(response.checkoutFields || {}) } as Record<
+          string,
+          any
+        >;
+        if (!fields.order_invoice_number)
+          fields.order_invoice_number = String(idKy);
+
+        Object.entries(fields).forEach(([key, value]) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = String(value ?? "");
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+
+        setNotice(
+          "Chuyển sang cổng thanh toán SePay... Nếu không thấy gì, kiểm tra popup/blocker hoặc mở lại trang.",
+        );
+        return;
+      }
+
       setSelectedIdKy(idKy);
       setCheckoutSession({
         sessionId: String(idKy),
         qrUrl: checkoutUrl,
         description: String(response.requestId || response.orderRef || idKy),
-        qrImageUrl: checkoutUrl,
+        qrImageUrl: response.qrImageUrl || checkoutUrl,
         bankCode: response.bankCode,
         accountNumber: response.accountNumber || "",
         accountNo: response.accountNumber,
