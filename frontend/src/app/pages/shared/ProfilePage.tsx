@@ -12,7 +12,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
-import { Camera, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { updateProfileRequest } from "../../services/api";
@@ -128,9 +128,7 @@ export function ProfilePage() {
                     .slice(0, 2)}
                 </AvatarFallback>
               </Avatar>
-              <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors">
-                <Camera className="w-4 h-4" />
-              </button>
+              {/* Camera button removed per request */}
             </div>
             <div className="flex-1 text-center md:text-left">
               <h2

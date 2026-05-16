@@ -41,6 +41,15 @@ async function run() {
       WHERE TRANGTHAI IS NULL
          OR TRANGTHAI LIKE '%?%'
          OR TRANGTHAI LIKE N'%th%i%h%n%';
+
+      UPDATE THANHTOAN
+      SET TRANGTHAI = N'Chờ kế toán xác nhận'
+      WHERE NGUOIXACNHAN IS NULL
+        AND NGAYXACNHAN IS NULL
+        AND (
+          TRANGTHAI = N'Đã đóng'
+          OR TRANGTHAI = N'Đã thanh toán'
+        );
     `);
 
     const verification = await pool.request().query(`

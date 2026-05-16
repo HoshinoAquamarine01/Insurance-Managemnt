@@ -24,7 +24,7 @@ function normalizeText(value: unknown): string {
   const raw = String(value ?? "");
   if (!raw) return raw;
 
-  // First, do direct replacements of known corrupted patterns
+
   let cleaned = raw
     .replace(/th\?i h\?n/gi, "thời hạn")
     .replace(/hi\?u l\?c/gi, "hiệu lực")

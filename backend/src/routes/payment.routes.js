@@ -15,7 +15,9 @@ const {
   createCheckoutSession,
   confirmCheckoutSession,
   reportTransferredPayment,
+  recordManualBankTransfer,
   confirmAccountingPayment,
+  cancelAccountingPayment,
   ipnNotification,
 } = require("../controllers/payment.controller");
 
@@ -76,6 +78,12 @@ router.post(
 );
 
 router.post(
+  "/manual-bank-transfer",
+  requireRole(["accountant", "admin", "ke_toan"]),
+  recordManualBankTransfer,
+);
+
+router.post(
   "/sepay/ipn",
   ipnNotificationRules,
   validateRequest,
@@ -109,6 +117,14 @@ router.put(
   confirmAccountingPaymentRules,
   validateRequest,
   confirmAccountingPayment,
+);
+
+router.put(
+  "/:id/cancel",
+  requireRole(["accountant", "admin"]),
+  confirmAccountingPaymentRules,
+  validateRequest,
+  cancelAccountingPayment,
 );
 
 // SePay redirect endpoints (no auth required)

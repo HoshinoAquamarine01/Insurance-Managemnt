@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -40,25 +40,11 @@ function hasPaymentRecord(payment: any) {
 }
 
 function isAccountantConfirmed(payment: any) {
-  const confirmerId = Number(payment?.NGUOIXACNHAN);
-  if (Number.isInteger(confirmerId) && confirmerId > 0) {
-    return true;
-  }
-
-  const confirmedAt = String(payment?.NGAYXACNHAN || "").trim();
-  if (confirmedAt) {
-    return true;
-  }
-
   const paymentStatus = String(
     payment?.TRANGTHAI_THANHTOAN || payment?.TRANGTHAI || "",
   ).toLowerCase();
 
-  return (
-    paymentStatus.includes("đã xác nhận") ||
-    paymentStatus.includes("da xac nhan") ||
-    paymentStatus.includes("confirmed")
-  );
+  return paymentStatus.includes("đã đóng") || paymentStatus.includes("da dong");
 }
 
 function getPaymentAmount(payment: any) {
@@ -77,10 +63,10 @@ function getPaymentStatusLabel(payment: any) {
   }
 
   if (isAccountantConfirmed(payment)) {
-    return "Đã xác nhận";
+    return "Đã đóng";
   }
 
-  return "Chờ kế toán xác nhận";
+  return "Chưa thanh toán";
 }
 
 function getPaymentStatusTone(payment: any) {
@@ -92,13 +78,11 @@ function getPaymentStatusTone(payment: any) {
     return "bg-status-active/10 text-status-active";
   }
 
-  return "bg-status-pending/10 text-status-pending";
+  return "bg-neutral-100 text-neutral-800";
 }
 
 function isSettledPayment(payment: any) {
-  if (hasPaymentRecord(payment)) {
-    return true;
-  }
+  if (payment?.NGUOIXACNHAN) return true;
 
   const status = String(payment?.TRANGTHAI || "").toLowerCase();
   return status.includes("đã") || status.includes("da");
@@ -175,6 +159,7 @@ function getDueDateTime(payment: any) {
 
 export function PaymentHistoryPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,6 +217,7 @@ export function PaymentHistoryPage() {
       setProcessingPaymentId(idKy);
       setNotice("");
       const response = await createPaymentCheckoutSession({ idKy }, user.role);
+
       const checkoutUrl =
         response.qrImageUrl ||
         response.qrUrl ||
@@ -242,6 +228,55 @@ export function PaymentHistoryPage() {
 
       if (!checkoutUrl) {
         setNotice("Không nhận được phiên thanh toán SePay. Vui lòng thử lại.");
+        return;
+      }
+
+      // If gateway requires a POST form to start checkout, submit it to redirect
+      if (response.checkoutActionUrl && response.checkoutFields) {
+        setSelectedIdKy(idKy);
+        setCheckoutSession({
+          ...response,
+          qrImageUrl:
+            response.qrImageUrl || response.qrUrl || response.checkoutActionUrl,
+          qrUrl:
+            response.payUrl ||
+            response.qrImageUrl ||
+            response.checkoutActionUrl,
+          transferContent: String(
+            response.transferContent ||
+              response.requestId ||
+              response.orderRef ||
+              idKy,
+          ),
+        });
+
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = response.checkoutActionUrl;
+        form.target = "_self";
+
+        const fields = { ...(response.checkoutFields || {}) } as Record<
+          string,
+          any
+        >;
+        if (!fields.order_invoice_number)
+          fields.order_invoice_number = String(idKy);
+
+        Object.entries(fields).forEach(([key, value]) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = String(value ?? "");
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+
+        setNotice(
+          "Chuyển sang cổng thanh toán SePay... Nếu không thấy gì, kiểm tra popup/blocker hoặc mở lại trang.",
+        );
         return;
       }
 
@@ -272,6 +307,7 @@ export function PaymentHistoryPage() {
     }
   }
 
+  // Polling effect to detect when webhook updates payment status
   useEffect(() => {
     if (!user || !checkoutSession || !selectedIdKy) {
       return;
@@ -291,17 +327,28 @@ export function PaymentHistoryPage() {
       if (selected && isSettledPayment(selected)) {
         setCheckoutSession(null);
         setSelectedIdKy(null);
-        setNotice(
-          "Giao dịch đã được hệ thống ghi nhận. Trạng thái thanh toán đã cập nhật tự động.",
+
+        // Navigate to success page
+        const amount = getPaymentAmount(selected);
+        const orderRef = String(
+          checkoutSession?.transferContent ||
+            checkoutSession?.requestId ||
+            checkoutSession?.orderRef ||
+            selected.IDKY,
+        );
+
+        navigate(
+          `/payments/success?payment=success&idKy=${selected.IDKY}&orderRef=${encodeURIComponent(orderRef)}&amount=${encodeURIComponent(amount)}`,
+          { replace: true },
         );
       }
-    }, 4000);
+    }, 2000); // Poll every 2 seconds
 
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [checkoutSession, selectedIdKy, user]);
+  }, [checkoutSession, selectedIdKy, user, navigate]);
 
   function handleExportPayments() {
     if (!filteredPayments.length) return;

@@ -47,6 +47,14 @@
   --color-surface: #f9fafb; /* Light gray for cards/containers */
   --color-surface-hover: #f3f4f6;
 
+  /* Popover & Card Backgrounds */
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --input: #ffffff;
+  --input-background: #ffffff;
+
   /* Borders & Inputs */
   --color-border: #e5e7eb; /* Neutral-200 */
   --color-border-focus: #0d9488; /* Brand teal on focus */

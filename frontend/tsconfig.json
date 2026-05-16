@@ -21,8 +21,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "lucide-react": ["src/shims/lucide-react"],
-      "react-router-dom": ["src/shims/react-router-dom"]
+      "lucide-react": ["src/types/lucide-react"],
+      "react-router-dom": ["src/types/react-router-dom"]
     }
   },
   "include": ["src", "vite-env.d.ts"],

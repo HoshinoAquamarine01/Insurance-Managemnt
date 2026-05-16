@@ -33,7 +33,7 @@ import {
 import { format } from "date-fns";
 import { motion } from "motion/react";
 import { useAuth } from "../../contexts/AuthContext";
-import { getDashboardSummary } from "../../services/api";
+import { getDashboardSummary, getPayments } from "../../services/api";
 
 const reportTypes = [
   {
@@ -149,7 +149,7 @@ export function ReportsPage() {
     ];
   }, [summary]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!selectedReport) {
       setNotice("Vui lòng chọn loại báo cáo.");
       return;
@@ -191,12 +191,41 @@ export function ReportsPage() {
       rows.push(["Chưa thu", Number(summary?.payments?.CHUATHU || 0)]);
       rows.push(["Tổng phiếu", Number(summary?.payments?.TONGSOPHIEU || 0)]);
     } else if (selectedReport === "payment") {
-      const recentPayments = summary?.recentPayments || [];
+      // Fetch full payments list (both paid and unpaid) so report includes all periods with amounts
+      let allPayments: any[] = [];
+      try {
+        allPayments = await getPayments(user?.role || "");
+      } catch (err) {
+        // fallback to summary.recentPayments if API fails
+        allPayments = summary?.recentPayments || [];
+      }
+
       rows.push(["Mã kỳ", "Ngày", "Số tiền", "Phương thức", "Trạng thái"]);
-      recentPayments.forEach((payment: any) => {
+
+      // Include all payments for the payment report (user expects all periods)
+      const paymentsInRange = (allPayments || []).slice();
+
+      // Sort by due date ascending; put undated items at the end
+      paymentsInRange.sort((a: any, b: any) => {
+        const aDateStr = a.NGAYDONGPHI || a.NGAYDENHAN || "";
+        const bDateStr = b.NGAYDONGPHI || b.NGAYDENHAN || "";
+        const aHas = Boolean(aDateStr);
+        const bHas = Boolean(bDateStr);
+        if (aHas && bHas) {
+          const ad = new Date(String(aDateStr));
+          const bd = new Date(String(bDateStr));
+          return ad.getTime() - bd.getTime();
+        }
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+        return Number(a.IDKY || 0) - Number(b.IDKY || 0);
+      });
+
+      paymentsInRange.forEach((payment: any) => {
+        const dateVal = payment.NGAYDONGPHI || payment.NGAYDENHAN || "";
         rows.push([
           payment.IDKY || "",
-          String(payment.NGAYDONGPHI || payment.NGAYDENHAN || "").slice(0, 10),
+          dateVal ? String(dateVal).slice(0, 10) : "",
           Number(payment.SOTIEN || 0),
           payment.PHUONGTHUC || "",
           payment.TRANGTHAI || "",
@@ -234,13 +263,151 @@ export function ReportsPage() {
 
     const fileDate = new Date().toISOString().slice(0, 10);
     const fileBase = `${selectedReport}-report-${fileDate}`;
-    // Export using CSV for compatibility across spreadsheet tools.
-    downloadCsvFile(`${fileBase}.csv`, csv);
 
-    if (formatType === "csv") {
-      setNotice("Đã xuất báo cáo CSV thành công.");
+    if (formatType === "pdf") {
+      // Try to generate PDF client-side using html2canvas + jsPDF (loaded from CDN).
+      const htmlRows = rows
+        .map(
+          (r) =>
+            `<tr>${r
+              .map(
+                (c) =>
+                  `<td style="padding:6px;border:1px solid #ddd;">${String(c)}</td>`,
+              )
+              .join("")}</tr>`,
+        )
+        .join("");
+
+      const html = `
+        <div style="font-family:Segoe UI,Roboto,Arial,sans-serif;padding:20px;background:#fff;color:#111;">
+          <h2>${fileBase}</h2>
+          <table style="border-collapse:collapse;width:100%;">
+            ${htmlRows}
+          </table>
+        </div>
+      `;
+
+      const loadScript = (src: string) =>
+        new Promise<void>((resolve, reject) => {
+          if (document.querySelector(`script[src="${src}"]`)) return resolve();
+          const s = document.createElement("script");
+          s.src = src;
+          s.async = true;
+          s.onload = () => resolve();
+          s.onerror = (e) => reject(e);
+          document.head.appendChild(s);
+        });
+
+      // Create container element to render HTML for capture
+      const container = document.createElement("div");
+      container.style.width = "800px";
+      container.style.margin = "0 auto";
+      container.style.background = "#fff";
+      container.innerHTML = html;
+      document.body.appendChild(container);
+
+      try {
+        // load html2canvas and jspdf UMD builds
+        await loadScript(
+          "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js",
+        );
+        await loadScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js");
+
+        const html2canvas = (window as any).html2canvas;
+        const jsPDFModule = (window as any).jspdf || (window as any).jsPDF;
+        const jsPDF = jsPDFModule?.jsPDF || jsPDFModule;
+
+        if (!html2canvas || !jsPDF) {
+          throw new Error("PDF libraries not available");
+        }
+
+        const canvas = await html2canvas(container as HTMLElement, {
+          scale: 2,
+        });
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+
+        const pdf = new jsPDF({ unit: "pt", format: "a4" });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const ratio = canvas.width / canvas.height;
+        const imgWidth = pdfWidth;
+        const imgHeight = pdfWidth / ratio;
+
+        pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight);
+
+        const blob = pdf.output("blob");
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${fileBase}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        setNotice("Đã tải về file PDF.");
+      } catch (err) {
+        // If anything fails, fallback to opening printable HTML or downloading HTML file
+        try {
+          const win = window.open("", "_blank", "noopener,noreferrer");
+          if (win) {
+            win.document.open();
+            win.document.write(
+              `<html><head><title>${fileBase}</title></head><body>${html}</body></html>`,
+            );
+            win.document.close();
+            win.focus();
+            setTimeout(() => {
+              try {
+                win.print();
+                setNotice("Mở trình in để lưu PDF (chọn 'Save as PDF').");
+              } catch (_) {
+                setNotice(
+                  "Không thể mở trình in tự động. Vui lòng thử in trang này.",
+                );
+              }
+            }, 300);
+          } else {
+            const blob = new Blob([`<html><body>${html}</body></html>`], {
+              type: "text/html",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${fileBase}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            setNotice(
+              "Trình duyệt chặn popup. Tải về file HTML thay thế, mở file rồi in (Save as PDF).",
+            );
+          }
+        } catch (err2) {
+          setNotice(
+            "Không thể tạo PDF tự động; vui lòng cho phép popup hoặc thử trình duyệt khác.",
+          );
+        }
+      } finally {
+        container.remove();
+      }
+    } else if (formatType === "excel") {
+      // Download CSV bytes as .xls for Excel compatibility
+      const blob = new Blob(["\ufeff", csv], {
+        type: "application/vnd.ms-excel",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${fileBase}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setNotice("Đã tải về file Excel (.xls). Mở bằng Excel để kiểm tra.");
     } else {
-      setNotice("Đã xuất dạng CSV để mở bằng Excel hoặc Sheets.");
+      // Default CSV
+      downloadCsvFile(`${fileBase}.csv`, csv);
+      setNotice("Đã xuất báo cáo CSV thành công.");
     }
   };
 

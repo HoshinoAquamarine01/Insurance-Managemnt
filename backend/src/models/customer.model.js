@@ -161,7 +161,7 @@ async function getPaymentsByCustomer(idNguoidung) {
         JOIN NGUOIDUOCBAOHIEM NDB ON H.IDNGUOIDUOCBH = NDB.IDNGUOIDUOCBH
         WHERE NDB.IDNGUOIDUNG = @IDNGUOIDUNG
       )
-      ORDER BY K.NGAYDENHAN DESC
+      ORDER BY K.NGAYDENHAN ASC
     `);
 
   return result.recordset;

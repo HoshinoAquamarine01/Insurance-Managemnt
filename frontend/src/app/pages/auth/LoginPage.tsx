@@ -17,10 +17,9 @@ import {
   EyeOff,
   Sparkles,
   CheckCircle2,
-  Star,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -47,47 +46,11 @@ export function LoginPage() {
     }
   };
 
-  const quickLoginOptions = [
-    {
-      role: "Người lập hợp đồng",
-      username: "creator@insurance.vn",
-      bgColor: "bg-[#d1fae5]",
-      textColor: "text-[#047857]",
-      hoverBorderColor: "hover:border-[#047857]",
-    },
-    {
-      role: "Người được bảo hiểm",
-      username: "insured@insurance.vn",
-      bgColor: "bg-[#dbeafe]",
-      textColor: "text-[#0284c7]",
-      hoverBorderColor: "hover:border-[#0284c7]",
-    },
-    {
-      role: "Kế toán",
-      username: "accountant@insurance.vn",
-      bgColor: "bg-[#fef3c7]",
-      textColor: "text-[#d97706]",
-      hoverBorderColor: "hover:border-[#d97706]",
-    },
-    {
-      role: "Giám sát",
-      username: "supervisor@insurance.vn",
-      bgColor: "bg-[#ede9fe]",
-      textColor: "text-[#7c3aed]",
-      hoverBorderColor: "hover:border-[#7c3aed]",
-    },
-    {
-      role: "Quản trị viên",
-      username: "admin@insurance.vn",
-      bgColor: "bg-[#e5e7eb]",
-      textColor: "text-[#111827]",
-      hoverBorderColor: "hover:border-[#111827]",
-    },
-  ];
+  
 
   return (
     <div className="min-h-screen flex bg-[linear-gradient(135deg,#faf7f2_0%,#f5f7fb_100%)]">
-      {/* Left side - Branding */}
+     
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -162,7 +125,6 @@ export function LoginPage() {
         </div>
       </motion.div>
 
-      {/* Right side - Login Form */}
       <div className="flex-1 flex items-center justify-center p-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -225,12 +187,6 @@ export function LoginPage() {
                     <Label htmlFor="password" className="text-sm">
                       Mật khẩu
                     </Label>
-                    <Link
-                      to="/forgot-password"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Quên mật khẩu?
-                    </Link>
                   </div>
                   <div className="relative">
                     <Input
@@ -262,68 +218,7 @@ export function LoginPage() {
                 {error ? <p className="text-sm text-red-600">{error}</p> : null}
               </form>
 
-              <div className="mt-7">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase tracking-[0.16em]">
-                    <span className="bg-card px-3 text-muted-foreground">
-                      Đăng nhập nhanh (Demo)
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-5">
-                  {quickLoginOptions.map((option) => (
-                    <button
-                      type="button"
-                      key={option.username}
-                      onClick={async () => {
-                        setLoading(true);
-                        setError("");
-
-                        try {
-                          await login(option.username, "demo123!");
-                          navigate("/dashboard");
-                        } catch (loginError) {
-                          setError(
-                            loginError instanceof Error
-                              ? loginError.message
-                              : "Đăng nhập thất bại",
-                          );
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
-                      className={`p-3.5 rounded-xl border border-border ${option.hoverBorderColor} transition-all text-left group hover:shadow-sm bg-white`}
-                    >
-                      <div
-                        className={`w-8 h-8 rounded-md ${option.bgColor} flex items-center justify-center mb-2 transition-colors`}
-                      >
-                        <Shield className={`w-4 h-4 ${option.textColor}`} />
-                      </div>
-                      <p className="text-sm font-medium leading-5">
-                        {option.role}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-6 rounded-xl border border-border/70 bg-slate-50 p-4">
-                  <div className="mb-1 flex items-center gap-1 text-amber-500">
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                  </div>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    "Giao diện mới dễ dùng hơn hẳn cho đội nghiệp vụ và chăm sóc
-                    khách hàng."
-                  </p>
-                </div>
-              </div>
+              
 
               <div className="mt-7 text-center text-sm text-muted-foreground">
                 Tài khoản được cấp bởi quản trị viên hệ thống.

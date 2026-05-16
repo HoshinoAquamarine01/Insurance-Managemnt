@@ -143,7 +143,7 @@ const updatePassword = asyncHandler(async (req, res) => {
       SELECT ND.IDNGUOIDUNG
       FROM NGUOIDUNG ND
       WHERE ND.IDNGUOIDUNG = @IDNGUOIDUNG
-        AND ND.MATKHAU = CONVERT(NVARCHAR(255), CONVERT(VARBINARY(MAX), HASHBYTES('SHA2_256', @CURRENT_PASSWORD + CONVERT(VARCHAR(MAX), ND.SALT))), 2)
+        AND ND.MATKHAU = HASHBYTES('SHA2_256', CONVERT(VARCHAR(MAX), @CURRENT_PASSWORD) + CONVERT(VARCHAR(MAX), ND.SALT))
     `);
 
   if (!verifyResult.recordset.length) {
@@ -154,8 +154,17 @@ const updatePassword = asyncHandler(async (req, res) => {
     .request()
     .input("IDNGUOIDUNG", sql.Int, idNguoidung)
     .input("NEW_PASSWORD", sql.NVarChar(255), String(newPassword)).query(`
+      DECLARE @HASHEDPW VARBINARY(64);
+
+      SELECT @HASHEDPW = HASHBYTES(
+        'SHA2_256',
+        CONVERT(VARCHAR(MAX), @NEW_PASSWORD) + CONVERT(VARCHAR(MAX), SALT)
+      )
+      FROM NGUOIDUNG
+      WHERE IDNGUOIDUNG = @IDNGUOIDUNG;
+
       UPDATE ND
-      SET ND.MATKHAU = CONVERT(NVARCHAR(255), CONVERT(VARBINARY(MAX), HASHBYTES('SHA2_256', @NEW_PASSWORD + CONVERT(VARCHAR(MAX), ND.SALT))), 2)
+      SET ND.MATKHAU = @HASHEDPW
       FROM NGUOIDUNG ND
       WHERE ND.IDNGUOIDUNG = @IDNGUOIDUNG
     `);

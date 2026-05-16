@@ -224,6 +224,7 @@ export function ContractsListPage() {
   const [installmentsLoading, setInstallmentsLoading] = useState(false);
   const [installmentsError, setInstallmentsError] = useState("");
   const isCreator = user?.role === "creator";
+  const showPaymentColumn = user?.role !== "supervisor";
   const isHistoryPage = location.pathname === "/contracts/history";
   const detailReturnPath =
     (location.state as { from?: string } | null | undefined)?.from ||
@@ -487,14 +488,14 @@ export function ContractsListPage() {
                 <p className="text-sm text-muted-foreground">Status</p>
                 <Badge
                   variant="secondary"
-                  className={
+                  className={`${
                     statusColors[
                       normalizeStatus(
                         selectedContract.TRANGTHAI,
                         selectedContract.NGAYKETTHUC,
                       ).toLowerCase()
                     ] || ""
-                  }
+                  } text-base font-semibold`}
                 >
                   {normalizeStatus(
                     selectedContract.TRANGTHAI,
@@ -537,7 +538,9 @@ export function ContractsListPage() {
                       <TableHead>Ngày đến hạn</TableHead>
                       <TableHead>Số tiền</TableHead>
                       <TableHead>Trạng thái</TableHead>
-                      <TableHead className="text-right">Thanh toán</TableHead>
+                      {showPaymentColumn && (
+                        <TableHead className="text-right">Thanh toán</TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -562,13 +565,15 @@ export function ContractsListPage() {
                             {getInstallmentStatusLabel(item.TRANGTHAI)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to={`/payments?installment=${item.IDKY}`}>
-                              Xem thanh toán
-                            </Link>
-                          </Button>
-                        </TableCell>
+                        {showPaymentColumn && (
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link to={`/payments?installment=${item.IDKY}`}>
+                                Xem thanh toán
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -614,8 +619,6 @@ export function ContractsListPage() {
               <SelectContent>
                 <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="còn thời hạn">Hiệu lực</SelectItem>
-                <SelectItem value="chờ duyệt">Chờ duyệt</SelectItem>
-                <SelectItem value="bản nháp">Bản nháp</SelectItem>
                 <SelectItem value="đã hết hạn">Hết hạn</SelectItem>
               </SelectContent>
             </Select>

@@ -76,22 +76,7 @@ export function CreatorDashboard() {
         bgColor: "bg-[#d1fae5]",
         iconColor: "text-[#059669]",
       },
-      {
-        label: "Chờ duyệt",
-        value: contracts.CHODUYET ?? 0,
-        change: "Đang chờ phê duyệt",
-        icon: Clock,
-        bgColor: "bg-[#fef3c7]",
-        iconColor: "text-[#eab308]",
-      },
-      {
-        label: "Bản nháp",
-        value: contracts.BANNHAP ?? 0,
-        change: "Chưa gửi duyệt",
-        icon: FileText,
-        bgColor: "bg-[#e5e7eb]",
-        iconColor: "text-[#6b7280]",
-      },
+      // Removed 'Chờ duyệt' and 'Bản nháp' metrics per request
     ];
   }, [summary]);
 

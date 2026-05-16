@@ -19,6 +19,7 @@ export function VietQrCheckoutCard({
   reporting = false,
 }: VietQrCheckoutCardProps) {
   const [copied, setCopied] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   if (!session) return null;
   const checkoutSession = session;
@@ -66,11 +67,34 @@ export function VietQrCheckoutCard({
       <CardContent>
         <div className="grid gap-6 lg:grid-cols-[280px_1fr] items-start">
           <div className="rounded-2xl border bg-background p-3 shadow-sm flex items-center justify-center">
-            <img
-              src={checkoutSession.qrImageUrl || checkoutSession.qrUrl || ""}
-              alt="VietQR checkout"
-              className="w-full max-w-[260px] rounded-xl"
-            />
+            {!imageError ? (
+              <img
+                src={checkoutSession.qrImageUrl || checkoutSession.qrUrl || ""}
+                alt="VietQR checkout"
+                className="w-full max-w-[260px] rounded-xl"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="p-4 text-center">
+                <p className="mb-2 text-sm text-muted-foreground">
+                  Không thể tải mã QR tại đây.
+                </p>
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const url =
+                        checkoutSession.qrImageUrl ||
+                        checkoutSession.qrUrl ||
+                        "";
+                      if (url) window.open(url, "_blank");
+                    }}
+                  >
+                    Mở QR trong tab mới
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4 text-sm">

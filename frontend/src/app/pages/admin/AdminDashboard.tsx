@@ -7,6 +7,9 @@ import {
   createAdminContract,
   createAdminUser,
   createInsuranceTypeAdmin,
+  updateAdminContract,
+  updateAdminUser,
+  updateInsuranceTypeAdmin,
   deleteAdminAssignment,
   deleteAdminContract,
   deleteAdminUser,
@@ -17,15 +20,7 @@ import {
   getContracts,
   getDashboardSummary,
   getInsuranceTypes,
-  updateAdminContract,
-  updateAdminUser,
-  updateInsuranceTypeAdmin,
 } from "../../services/api";
-import { Button } from "../../components/ui/button";
-import { Badge } from "../../components/ui/badge";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import { Textarea } from "../../components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -33,37 +28,34 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "../../components/ui/tabs";
+import {
+  ArrowRight,
+  Database,
+  Users,
+  FileText,
+  Shield,
+  Wallet,
+  Activity as ActivityIcon,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "../../components/ui/dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "../../components/ui/tabs";
-import {
-  Activity as ActivityIcon,
-  FileText,
-  Shield,
-  Users,
-  Wallet,
-  Database,
-  ArrowRight,
-} from "lucide-react";
-
-type AdminTab =
-  | "overview"
-  | "users"
-  | "insurance-types"
-  | "contracts"
-  | "assignments"
-  | "activity";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
 
 type UserFormState = {
   mode: "create" | "edit";
@@ -114,6 +106,10 @@ function formatDate(value: unknown) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function getEventAt(entry: any) {
+  return entry?.EVENT_AT_LOCAL || entry?.EVENT_AT_UTC || entry?.EVENT_AT || "";
 }
 
 function formatCurrency(value: unknown) {
@@ -223,6 +219,8 @@ export function AdminDashboard() {
   const [insuranceTypes, setInsuranceTypes] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
+  const [activityPage, setActivityPage] = useState(1);
+  const ACTIVITY_PAGE_SIZE = 10;
   const [loading, setLoading] = useState(true);
   const [userFormOpen, setUserFormOpen] = useState(false);
   const [insuranceTypeFormOpen, setInsuranceTypeFormOpen] = useState(false);
@@ -265,7 +263,7 @@ export function AdminDashboard() {
     ngayKetThuc: "",
   });
 
-  const activeTab = (searchParams.get("tab") || "overview") as AdminTab;
+  const activeTab = (searchParams.get("tab") || "overview") as string;
   const contractSearchKeyword = String(searchParams.get("q") || "")
     .toLowerCase()
     .trim();
@@ -315,12 +313,14 @@ export function AdminDashboard() {
         ]);
 
         if (isMounted) {
+          console.debug("loadData: activityData (from API)", activityData);
           setSummary(summaryData);
           setUsers(usersData);
           setContracts(contractsData);
           setInsuranceTypes(insuranceTypesData);
           setAssignments(assignmentsData);
           setActivity(activityData);
+          setActivityPage(1);
         }
       } finally {
         if (isMounted) {
@@ -354,12 +354,14 @@ export function AdminDashboard() {
       getAdminActivity(user.role),
     ]);
 
+    console.debug("reloadAdminData: activityData (from API)", activityData);
     setSummary(summaryData);
     setUsers(usersData);
     setContracts(contractsData);
     setInsuranceTypes(insuranceTypesData);
     setAssignments(assignmentsData);
     setActivity(activityData);
+    setActivityPage(1);
   }
 
   function openAssignForm(entry: any) {
@@ -496,6 +498,23 @@ export function AdminDashboard() {
           throw new Error("Vui lòng nhập mật khẩu");
         }
 
+        // Client-side pre-check to avoid server 409 on duplicate username
+        try {
+          const existing = await getAdminUsers(user.role);
+          const normalized = userForm.username.trim().toLowerCase();
+          if (
+            existing.some(
+              (u: any) =>
+                String(u.TENDANGNHAP || "").toLowerCase() === normalized,
+            )
+          ) {
+            throw new Error("Username already exists");
+          }
+        } catch (err) {
+          // If fetching users failed, continue and let server validate
+          console.warn("Pre-check for existing username failed:", err);
+        }
+
         await createAdminUser(
           {
             username: userForm.username.trim(),
@@ -532,7 +551,7 @@ export function AdminDashboard() {
   async function handleDeleteUser(entry: any) {
     if (!user) return;
     const confirmed = window.confirm(
-      `Delete user ${entry.TENDANGNHAP}? Nếu có dữ liệu liên quan thì hệ thống sẽ chuyển sang ngưng hoạt động.`,
+      `Xóa người dùng ${entry.TENDANGNHAP}? Nếu có dữ liệu liên quan thì hệ thống sẽ chuyển sang ngưng hoạt động.`,
     );
     if (!confirmed) return;
 
@@ -597,7 +616,7 @@ export function AdminDashboard() {
 
   async function handleDeleteInsuranceType(entry: any) {
     if (!user) return;
-    const confirmed = window.confirm(`Delete insurance type ${entry.TENLOAI}?`);
+    const confirmed = window.confirm(`Xóa loại bảo hiểm ${entry.TENLOAI}?`);
     if (!confirmed) return;
 
     await deleteInsuranceTypeAdmin(entry.IDLOAI, user.role);
@@ -698,7 +717,7 @@ export function AdminDashboard() {
 
   async function handleDeleteContract(entry: any) {
     if (!user) return;
-    const confirmed = window.confirm(`Delete contract ${entry.SOHOPDONG}?`);
+    const confirmed = window.confirm(`Xóa hợp đồng ${entry.SOHOPDONG}?`);
     if (!confirmed) return;
 
     await deleteAdminContract(entry.IDHOPDONG, user.role);
@@ -860,7 +879,10 @@ export function AdminDashboard() {
                 ) : (
                   overviewActivity.map((entry) => (
                     <div
-                      key={`${entry.ENTITY_TYPE}-${entry.ENTITY_ID}-${String(entry.EVENT_AT)}`}
+                      key={
+                        entry.IDNHATKY ||
+                        `${entry.ENTITY_TYPE}-${entry.ENTITY_ID}-${String(getEventAt(entry))}`
+                      }
                       className="flex items-start gap-3 rounded-xl border border-border/70 p-4"
                     >
                       <div className="mt-1 rounded-full bg-muted p-2 text-muted-foreground">
@@ -869,10 +891,10 @@ export function AdminDashboard() {
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="outline" className="rounded-full">
-                            {getActivityLabel(entry)}
+                            {entry.ACTION_LABEL || getActivityLabel(entry)}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {formatDate(entry.EVENT_AT)}
+                            {formatDate(getEventAt(entry))}
                           </span>
                         </div>
                         <p className="text-sm font-medium">
@@ -1042,21 +1064,21 @@ export function AdminDashboard() {
                               size="sm"
                               onClick={() => openEditUserForm(entry)}
                             >
-                              Edit
+                              Sửa
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => void handleDeleteUser(entry)}
                             >
-                              Delete
+                              Xóa
                             </Button>
                             <Button
                               variant="secondary"
                               size="sm"
                               onClick={() => openAssignForm(entry)}
                             >
-                              Assign
+                              Phân công
                             </Button>
                           </div>
                         </td>
@@ -1065,6 +1087,39 @@ export function AdminDashboard() {
                   })}
                 </tbody>
               </table>
+              {/* Pagination controls */}
+              {activity.length > ACTIVITY_PAGE_SIZE && (
+                <div className="flex items-center justify-end gap-2 mt-3">
+                  <button
+                    className="px-2 py-1 rounded border"
+                    onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+                    disabled={activityPage === 1}
+                  >
+                    Prev
+                  </button>
+                  <span className="text-sm text-muted-foreground">
+                    Trang {activityPage} /{" "}
+                    {Math.ceil(activity.length / ACTIVITY_PAGE_SIZE)}
+                  </span>
+                  <button
+                    className="px-2 py-1 rounded border"
+                    onClick={() =>
+                      setActivityPage((p) =>
+                        Math.min(
+                          Math.ceil(activity.length / ACTIVITY_PAGE_SIZE),
+                          p + 1,
+                        ),
+                      )
+                    }
+                    disabled={
+                      activityPage >=
+                      Math.ceil(activity.length / ACTIVITY_PAGE_SIZE)
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1346,15 +1401,18 @@ export function AdminDashboard() {
                   {activity.length > 0 ? (
                     activity.map((entry) => (
                       <tr
-                        key={`${entry.ENTITY_TYPE}-${entry.ENTITY_ID}-${String(entry.EVENT_AT)}`}
+                        key={
+                          entry.IDNHATKY ||
+                          `${entry.ENTITY_TYPE}-${entry.ENTITY_ID}-${String(getEventAt(entry))}`
+                        }
                         className="border-b border-border/60 last:border-0"
                       >
                         <td className="py-4 text-muted-foreground">
-                          {formatDate(entry.EVENT_AT)}
+                          {formatDate(getEventAt(entry))}
                         </td>
                         <td className="py-4">
                           <Badge variant="outline" className="rounded-full">
-                            {getActivityLabel(entry)}
+                            {entry.ACTION_LABEL || getActivityLabel(entry)}
                           </Badge>
                         </td>
                         <td className="py-4 text-muted-foreground">
@@ -1397,10 +1455,12 @@ export function AdminDashboard() {
       </Tabs>
 
       <Dialog open={userFormOpen} onOpenChange={setUserFormOpen}>
-        <DialogContent>
+        <DialogContent className="z-50">
           <DialogHeader>
             <DialogTitle>
-              {userForm.mode === "create" ? "Add user" : "Edit user"}
+              {userForm.mode === "create"
+                ? "Thêm người dùng"
+                : "Sửa người dùng"}
             </DialogTitle>
             <DialogDescription>
               {userForm.mode === "create"
@@ -1528,12 +1588,12 @@ export function AdminDashboard() {
         open={insuranceTypeFormOpen}
         onOpenChange={setInsuranceTypeFormOpen}
       >
-        <DialogContent>
+        <DialogContent className="z-50">
           <DialogHeader>
             <DialogTitle>
               {insuranceTypeForm.mode === "create"
-                ? "Add insurance type"
-                : "Edit insurance type"}
+                ? "Thêm loại bảo hiểm"
+                : "Sửa loại bảo hiểm"}
             </DialogTitle>
             <DialogDescription>
               Quản lý danh mục loại bảo hiểm.
@@ -1589,12 +1649,12 @@ export function AdminDashboard() {
       </Dialog>
 
       <Dialog open={contractFormOpen} onOpenChange={setContractFormOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl z-50">
           <DialogHeader>
             <DialogTitle>
               {contractForm.mode === "create"
-                ? "Add contract"
-                : "Edit contract"}
+                ? "Thêm hợp đồng"
+                : "Sửa hợp đồng"}
             </DialogTitle>
             <DialogDescription>
               Nhập thông tin hợp đồng để tạo mới hoặc cập nhật.
@@ -1777,7 +1837,7 @@ export function AdminDashboard() {
       </Dialog>
 
       <Dialog open={assignmentFormOpen} onOpenChange={setAssignmentFormOpen}>
-        <DialogContent>
+        <DialogContent className="z-50">
           <DialogHeader>
             <DialogTitle>Phân công loại bảo hiểm</DialogTitle>
             <DialogDescription>
