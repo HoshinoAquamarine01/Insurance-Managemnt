@@ -123,7 +123,12 @@ function normalizeText(value: unknown) {
     // Decode failed, keep cleaned version
   }
 
-  return cleaned;
+  // Remove stray trailing single-letter artifacts (e.g. " v") that
+  // sometimes appear due to encoding/rendering issues.
+  cleaned = cleaned.replace(/\s+[A-Za-z]$/i, "");
+
+  // Final trim and return
+  return cleaned.trim();
 }
 
 function getContractEndDate(value: unknown) {
