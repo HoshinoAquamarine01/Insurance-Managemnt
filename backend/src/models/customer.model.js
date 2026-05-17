@@ -174,3 +174,56 @@ module.exports = {
   getContractsByCustomer,
   getPaymentsByCustomer,
 };
+
+async function getMedicalHistoryByInsuredId(idNguoiDuocBh) {
+  const pool = await getPool();
+
+  // Run OPEN SYMMETRIC KEY and stored proc in same batch to ensure same session
+  try {
+    const result = await pool
+      .request()
+      .input("IDNGUOIDUOCBH", sql.BigInt, idNguoiDuocBh).query(`
+        OPEN SYMMETRIC KEY SymKeyQlbhAES DECRYPTION BY CERTIFICATE CertQlbhEncryption;
+        EXEC sp_GetNguoiduocBaoHiemEncrypted @IDNGUOIDUOCBH;
+        CLOSE SYMMETRIC KEY SymKeyQlbhAES;
+      `);
+
+    const row = result.recordset?.[0] || null;
+
+    // If DB didn't return decrypted LICHSUBENH but returned raw varbinary, try UTF-8 fallback
+    if (row && !row.LICHSUBENH_Decrypted && row.LICHSUBENH) {
+      try {
+        const raw = row.LICHSUBENH;
+        if (raw && Buffer.isBuffer(raw)) {
+          const attempt = raw.toString("utf8");
+          if (attempt && attempt.trim()) {
+            row.LICHSUBENH_Decrypted = attempt;
+            console.log(
+              "[DB_FALLBACK] Decoded LICHSUBENH via UTF-8 fallback for insured id",
+              idNguoiDuocBh,
+            );
+          }
+        }
+      } catch (decodeErr) {
+        console.log("[DB_FALLBACK] UTF-8 decode failed:", decodeErr.message);
+      }
+    }
+
+    if (row && !row.LICHSUBENH_Decrypted) {
+      console.log(
+        `[DB_INFO] LICHSUBENH not decrypted for insured id ${idNguoiDuocBh}. DB may lack permission to OPEN SYMMETRIC KEY.`,
+      );
+    }
+
+    return row;
+  } catch (err) {
+    console.error(
+      "[DB_ERROR] Failed to fetch medical history for",
+      idNguoiDuocBh,
+      err.message,
+    );
+    throw err;
+  }
+}
+
+module.exports.getMedicalHistoryByInsuredId = getMedicalHistoryByInsuredId;

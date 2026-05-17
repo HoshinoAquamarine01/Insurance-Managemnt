@@ -37,7 +37,16 @@ import {
   getContracts,
   getCustomerPayments,
   getExpiredContracts,
+  getMedicalHistory,
 } from "../../services/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../../components/ui/dialog";
 
 const CONTRACT_OVERRIDES_KEY = "insurance_contract_overrides";
 
@@ -230,6 +239,8 @@ export function ContractsListPage() {
   const [installmentsError, setInstallmentsError] = useState("");
   const isCreator = user?.role === "creator";
   const showPaymentColumn = user?.role !== "supervisor";
+  // Only admins should see the medical history column; supervisors should not.
+  const canViewMedical = String(user?.role || "").toLowerCase() === "admin";
   const isHistoryPage = location.pathname === "/contracts/history";
   const detailReturnPath =
     (location.state as { from?: string } | null | undefined)?.from ||
@@ -405,7 +416,9 @@ export function ContractsListPage() {
   }, [selectedContract, user]);
 
   const backLink = detailReturnPath;
-
+  const [medicalHistoryOpen, setMedicalHistoryOpen] = useState(false);
+  const [selectedMedicalHistory, setSelectedMedicalHistory] =
+    useState<string>("");
   return (
     <div className="w-full space-y-8 pb-4">
       <div className="flex w-full flex-col gap-4 rounded-3xl border border-border/60 bg-card/90 p-6 shadow-sm lg:flex-row lg:items-end lg:justify-between">
@@ -455,42 +468,42 @@ export function ContractsListPage() {
           {selectedContract && (
             <CardContent className="grid gap-5 p-6 md:grid-cols-2 xl:grid-cols-3">
               <div>
-                <p className="text-sm text-muted-foreground">Contract ID</p>
+                <p className="text-sm text-muted-foreground">Mã hợp đồng</p>
                 <p className="font-medium">{selectedContract.IDHOPDONG}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Client Name</p>
+                <p className="text-sm text-muted-foreground">Tên khách hàng</p>
                 <p className="font-medium">
                   {normalizeText(selectedContract.TENKHACHHANG)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Insurance Type</p>
+                <p className="text-sm text-muted-foreground">Loại bảo hiểm</p>
                 <p className="font-medium">
                   {insuranceTypeById[String(selectedContract.IDLOAI || "")] ||
                     normalizeText(selectedContract.TENLOAI)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Creator</p>
+                <p className="text-sm text-muted-foreground">Người tạo</p>
                 <p className="font-medium">
                   {normalizeText(selectedContract.TENNHANVIEN)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Start Date</p>
+                <p className="text-sm text-muted-foreground">Ngày bắt đầu</p>
                 <p className="font-medium">
                   {String(selectedContract.NGAYBATDAU).slice(0, 10)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">End Date</p>
+                <p className="text-sm text-muted-foreground">Ngày kết thúc</p>
                 <p className="font-medium">
                   {String(selectedContract.NGAYKETTHUC).slice(0, 10)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Status</p>
+                <p className="text-sm text-muted-foreground">Trạng thái</p>
                 <Badge
                   variant="secondary"
                   className={`${
@@ -509,7 +522,9 @@ export function ContractsListPage() {
                 </Badge>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Contract Value</p>
+                <p className="text-sm text-muted-foreground">
+                  Giá trị hợp đồng
+                </p>
                 <p className="font-medium">
                   {Number(selectedContract.GIATRI || 0).toLocaleString("vi-VN")}
                 </p>
@@ -628,6 +643,27 @@ export function ContractsListPage() {
               </SelectContent>
             </Select>
           </div>
+          <Dialog
+            open={medicalHistoryOpen}
+            onOpenChange={setMedicalHistoryOpen}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Lịch sử bệnh người được bảo hiểm</DialogTitle>
+                <DialogDescription>
+                  Dữ liệu nhạy cảm — chỉ hiển thị cho vai trò được phép.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-2 max-h-56 overflow-auto text-sm text-muted-foreground">
+                {selectedMedicalHistory}
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setMedicalHistoryOpen(false)}>
+                  Đóng
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
 
@@ -639,6 +675,7 @@ export function ContractsListPage() {
                 <TableRow>
                   <TableHead>Id hợp đồng</TableHead>
                   <TableHead>Tên khách hàng</TableHead>
+                  {canViewMedical && <TableHead>Lịch sử bệnh</TableHead>}
                   <TableHead>Loại bảo hiểm</TableHead>
                   <TableHead>Người tạo</TableHead>
                   <TableHead>Ngày bắt đầu</TableHead>
@@ -651,7 +688,7 @@ export function ContractsListPage() {
                 {loading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={canViewMedical ? 9 : 8}
                       className="py-10 text-center text-muted-foreground"
                     >
                       Đang tải hợp đồng...
@@ -672,6 +709,35 @@ export function ContractsListPage() {
                       <TableCell>
                         {normalizeText(contract.TENKHACHHANG)}
                       </TableCell>
+                      {canViewMedical && (
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const id =
+                                  contract.IDNGUOIDUOCBH ||
+                                  contract.IDNGUOIDUNG_BAOHIEM;
+                                if (!id) {
+                                  window.alert(
+                                    "Không tìm thấy người được bảo hiểm.",
+                                  );
+                                  return;
+                                }
+                              } catch (err) {
+                                window.alert(
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Lỗi",
+                                );
+                              }
+                            }}
+                          >
+                            Xem
+                          </Button>
+                        </TableCell>
+                      )}
                       <TableCell>
                         {insuranceTypeById[String(contract.IDLOAI || "")] ||
                           normalizeText(contract.TENLOAI)}
@@ -734,7 +800,7 @@ export function ContractsListPage() {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={canViewMedical ? 9 : 8}
                       className="py-10 text-center text-muted-foreground"
                     >
                       Không tìm thấy hợp đồng nào phù hợp với bộ lọc hiện tại.

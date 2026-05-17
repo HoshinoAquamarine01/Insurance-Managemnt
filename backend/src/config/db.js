@@ -6,7 +6,6 @@ function resolveSqlClient(authMode) {
     return sqlStandard;
   }
 
-  // Only load the native Windows driver when it is actually needed.
   return require("mssql/msnodesqlv8");
 }
 
@@ -157,7 +156,7 @@ async function getPool() {
       console.error("[DB_ERROR] Original error:", err.originalError.message);
     }
 
-    // If Windows auth failed, don't retry - just mark DB unavailable
+   
     dbUnavailable = true;
     pool = createUnavailablePool();
     return pool;
