@@ -406,26 +406,48 @@ GO
 -- Note: App layer must open symmetric key before calling this
 CREATE PROCEDURE sp_GetNguoiduocBaoHiemEncrypted
     @IDNGUOIDUOCBH BIGINT
+WITH EXECUTE AS OWNER
 AS
 BEGIN
     SET NOCOUNT ON;
-    
-    -- Requires: OPEN SYMMETRIC KEY SymKeyQlbhAES DECRYPTION BY CERTIFICATE CertQlbhEncryption;
-    SELECT 
-        IDNGUOIDUOCBH,
-        IDNGUOIDUNG,
-        HOTEN,
-        CONVERT(VARCHAR(20), DECRYPTBYKEY(CCCD)) AS CCCD_Decrypted,
-        GIOITINH,
-        NGAYSINH,
-        COQUAN,
-        DIACHITHUONGTRU,
-        DIACHITAMTRU,
-        DIACHILIENLAC,
-        CONVERT(VARCHAR(300), DECRYPTBYKEY(LICHSUBENH)) AS LICHSUBENH_Decrypted
-    FROM NGUOIDUOCBAOHIEM
-    WHERE IDNGUOIDUOCBH = @IDNGUOIDUOCBH;
+
+    -- Procedure opens the symmetric key itself so callers don't need key permissions.
+    BEGIN TRY
+        OPEN SYMMETRIC KEY SymKeyQlbhAES DECRYPTION BY CERTIFICATE CertQlbhEncryption;
+
+        SELECT 
+            IDNGUOIDUOCBH,
+            IDNGUOIDUNG,
+            HOTEN,
+            CONVERT(VARCHAR(20), DECRYPTBYKEY(CCCD)) AS CCCD_Decrypted,
+            GIOITINH,
+            NGAYSINH,
+            COQUAN,
+            DIACHITHUONGTRU,
+            DIACHITAMTRU,
+            DIACHILIENLAC,
+            CONVERT(VARCHAR(300), DECRYPTBYKEY(LICHSUBENH)) AS LICHSUBENH_Decrypted
+        FROM NGUOIDUOCBAOHIEM
+        WHERE IDNGUOIDUOCBH = @IDNGUOIDUOCBH;
+
+    END TRY
+    BEGIN CATCH
+        -- Surface error to caller for debugging (will be a single-column error result)
+        SELECT ERROR_MESSAGE() AS ErrorMessage;
+    END CATCH
+
+    BEGIN TRY
+        CLOSE SYMMETRIC KEY SymKeyQlbhAES;
+    END TRY
+    BEGIN CATCH
+        -- ignore close errors
+    END CATCH
 END
+GO
+
+-- Allow supervisors to execute the procedure (so they can see decrypted LICHSUBENH when needed)
+IF OBJECT_ID('sp_GetNguoiduocBaoHiemEncrypted', 'P') IS NOT NULL
+    GRANT EXECUTE ON OBJECT::sp_GetNguoiduocBaoHiemEncrypted TO Role_GiamSat;
 GO
 
 -- Grant EXECUTE permissions after procedures exist

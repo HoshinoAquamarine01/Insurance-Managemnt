@@ -21,6 +21,16 @@ const getCustomers = asyncHandler(async (req, res) => {
   return success(res, data, "Customers fetched");
 });
 
+const getMedicalHistory = asyncHandler(async (req, res) => {
+  const insuredId = Number(req.params.id);
+  if (!Number.isInteger(insuredId) || insuredId <= 0) {
+    throw new Error("Invalid insured id");
+  }
+
+  const data = await customerModel.getMedicalHistoryByInsuredId(insuredId);
+  return success(res, data, "Medical history fetched");
+});
+
 const createCustomer = asyncHandler(async (req, res) => {
   await customerModel.createCustomer(req.body);
   return success(res, null, "Customer created", 201);
@@ -52,4 +62,5 @@ module.exports = {
   createCustomer,
   getCustomerContracts,
   getCustomerPayments,
+  getMedicalHistory,
 };

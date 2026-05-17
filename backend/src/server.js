@@ -9,15 +9,12 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("[FATAL] Promise:", promise);
 });
 
-// Catch all uncaught exceptions
 process.on("uncaughtException", (error) => {
   console.error("[FATAL] Uncaught Exception:", error);
   console.error("[FATAL] Stack:", error.stack);
-  // Don't exit - try to stay alive
   console.error("[FATAL] Attempting to continue running...");
 });
 
-// Log when process is about to exit
 process.on("exit", (code) => {
   console.error(`[PROCESS_EXIT] Node.js process exiting with code ${code}`);
 });
@@ -38,7 +35,6 @@ async function startServer() {
     console.log(`[SERVER] Server listening on port ${port}`);
   });
 
-  // Handle server errors (including port already in use)
   server.on("error", (err) => {
     console.error("[SERVER] HTTP Server error:", err.message);
     if (err.code === "EADDRINUSE") {
@@ -50,7 +46,6 @@ async function startServer() {
     console.error("[SERVER] Full error:", err);
   });
 
-  // Log when server is closed
   server.on("close", () => {
     console.log("[SERVER] HTTP Server closed");
   });

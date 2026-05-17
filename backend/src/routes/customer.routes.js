@@ -7,6 +7,7 @@ const {
   createCustomer,
   getCustomerContracts,
   getCustomerPayments,
+  getMedicalHistory,
 } = require("../controllers/customer.controller");
 
 const router = express.Router();
@@ -29,6 +30,12 @@ router.get(
     "ke_toan",
   ]),
   getCustomerContracts,
+);
+router.get(
+  "/:id/medical-history",
+  requireRole(["admin", "giamsat", "supervisor"]),
+  // returns decrypted LICHSUBENH_Decrypted where permitted
+  getMedicalHistory,
 );
 router.get(
   "/:id/payments",

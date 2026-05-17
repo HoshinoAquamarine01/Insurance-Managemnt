@@ -202,6 +202,8 @@ export function CreatorDashboard() {
                           .trim();
 
                         let statusClass = "bg-muted text-muted-foreground";
+                        let displayStatus =
+                          contract.TRANGTHAI || "Chưa cập nhật";
 
                         if (
                           status.includes("còn") ||
@@ -220,6 +222,19 @@ export function CreatorDashboard() {
                           status.includes("het")
                         ) {
                           statusClass = "bg-[#fee2e2] text-[#b91c1c]";
+                        } else if (
+                          status.includes("hủy") ||
+                          status.includes("huy") ||
+                          status.includes("huỷ")
+                        ) {
+                          // Canceled: use a prominent red tone
+                          statusClass = "bg-[#fee2e2] text-[#b91c1c]";
+                          // Normalize display text to Vietnamese
+                          if (status.includes("đã") || status.includes("da")) {
+                            displayStatus = "Đã hủy";
+                          } else {
+                            displayStatus = "Hủy";
+                          }
                         }
 
                         return (
@@ -227,7 +242,7 @@ export function CreatorDashboard() {
                             variant="secondary"
                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}`}
                           >
-                            {contract.TRANGTHAI || "Chưa cập nhật"}
+                            {displayStatus}
                           </Badge>
                         );
                       })()}

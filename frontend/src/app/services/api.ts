@@ -100,6 +100,13 @@ export async function getInsuredAccounts(role: string) {
   return apiRequest<any[]>("/contracts/insured-accounts", { role });
 }
 
+export async function getMedicalHistory(
+  insuredId: string | number,
+  role: string,
+) {
+  return apiRequest<any>(`/customers/${insuredId}/medical-history`, { role });
+}
+
 export async function quickCreateContract(payload: any, role: string) {
   return apiRequest<any>("/contracts/quick-create", {
     method: "POST",

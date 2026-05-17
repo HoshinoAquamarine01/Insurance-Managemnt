@@ -235,6 +235,9 @@ export function AdminDashboard() {
   const [contractFormOpen, setContractFormOpen] = useState(false);
   const [assignmentFormOpen, setAssignmentFormOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [medicalHistoryOpen, setMedicalHistoryOpen] = useState(false);
+  const [selectedMedicalHistory, setSelectedMedicalHistory] =
+    useState<string>("");
   const [userForm, setUserForm] = useState<UserFormState>({
     mode: "create",
     username: "",
@@ -397,6 +400,22 @@ export function AdminDashboard() {
       ngayKetThuc: "",
     });
     setAssignmentFormOpen(true);
+  }
+
+  function openMedicalHistoryFor(entry: any) {
+    // Try to find the insured account record for this user
+    const insured = insuredAccounts.find(
+      (a) => String(a.IDNGUOIDUNG) === String(entry.IDNGUOIDUNG),
+    );
+
+    // If backend doesn't expose decrypted history yet, show placeholder
+    const history =
+      insured && (insured.LICHSUBENH || insured.LICHSUBENH_Decrypted)
+        ? String(insured.LICHSUBENH || insured.LICHSUBENH_Decrypted)
+        : "Chưa có dữ liệu lịch sử bệnh hoặc dữ liệu cần giải mã";
+
+    setSelectedMedicalHistory(history);
+    setMedicalHistoryOpen(true);
   }
 
   async function handleSubmitAssignmentForm(
@@ -1002,6 +1021,7 @@ export function AdminDashboard() {
                     <th className="pb-3 font-medium">Loại tài khoản</th>
                     <th className="pb-3 font-medium">Trạng thái</th>
                     <th className="pb-3 font-medium">Loại được phân công</th>
+                    <th className="pb-3 font-medium">Lịch sử bệnh</th>
                     <th className="pb-3 font-medium">Ngày tạo</th>
                     <th className="pb-3 font-medium">Thao tác</th>
                   </tr>
@@ -1082,6 +1102,30 @@ export function AdminDashboard() {
                                   </div>
                                 )}
                               </td>
+                              <td className="py-4">
+                                {assignmentByUser.some((a) =>
+                                  String(a.TENLOAI || "")
+                                    .toLowerCase()
+                                    .includes("sức khỏe"),
+                                ) &&
+                                insuredAccounts.some(
+                                  (a) =>
+                                    String(a.IDNGUOIDUNG) ===
+                                    String(entry.IDNGUOIDUNG),
+                                ) ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openMedicalHistoryFor(entry)}
+                                  >
+                                    Xem
+                                  </Button>
+                                ) : (
+                                  <span className="text-muted-foreground">
+                                    -
+                                  </span>
+                                )}
+                              </td>
                               <td className="py-4 text-muted-foreground">
                                 {formatDate(entry.NGAYTAO)}
                               </td>
@@ -1116,6 +1160,28 @@ export function AdminDashboard() {
                     : null}
                 </tbody>
               </table>
+              <Dialog
+                open={medicalHistoryOpen}
+                onOpenChange={setMedicalHistoryOpen}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Lịch sử bệnh</DialogTitle>
+                    <DialogDescription>
+                      Nội dung lịch sử bệnh (nếu có). Dữ liệu nhạy cảm có thể
+                      cần được giải mã ở phía server trước khi hiển thị.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="mt-2 max-h-56 overflow-auto text-sm text-muted-foreground">
+                    {selectedMedicalHistory}
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={() => setMedicalHistoryOpen(false)}>
+                      Đóng
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               {/* Users pagination controls */}
               {users.length > USERS_PAGE_SIZE && (
                 <div className="flex items-center justify-end gap-2 mt-3">
@@ -1261,57 +1327,62 @@ export function AdminDashboard() {
                           contractsPage * CONTRACTS_PAGE_SIZE,
                         )
                         .map((entry) => (
-                    <tr
-                      key={entry.IDHOPDONG}
-                      className="border-b border-border/60 last:border-0"
-                    >
-                      <td className="py-4 font-medium">{entry.SOHOPDONG}</td>
-                      <td className="py-4 text-muted-foreground">
-                        {normalizeText(entry.TENKHACHHANG)}
-                      </td>
-                      <td className="py-4 text-muted-foreground">
-                        {normalizeText(entry.TENNHANVIEN)}
-                      </td>
-                      <td className="py-4 text-muted-foreground">
-                        {normalizeText(entry.TENLOAI)}
-                      </td>
-                      <td className="py-4 text-muted-foreground">
-                        {formatCurrency(entry.GIATRI)}
-                      </td>
-                      <td className="py-4">
-                        <Badge
-                          variant="outline"
-                          className={`rounded-full ${getStatusTone(entry.TRANGTHAI)}`}
-                        >
-                          {normalizeText(entry.TRANGTHAI) || "-"}
-                        </Badge>
-                      </td>
-                      <td className="py-4 text-muted-foreground">
-                        {formatDate(entry.NGAYBATDAU)}
-                      </td>
-                      <td className="py-4 text-muted-foreground">
-                        {formatDate(entry.NGAYKETTHUC)}
-                      </td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEditContractForm(entry)}
+                          <tr
+                            key={entry.IDHOPDONG}
+                            className="border-b border-border/60 last:border-0"
                           >
-                            Sửa
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => void handleDeleteContract(entry)}
-                          >
-                            Xóa
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  )) : null}
+                            <td className="py-4 font-medium">
+                              {entry.SOHOPDONG}
+                            </td>
+                            <td className="py-4 text-muted-foreground">
+                              {normalizeText(entry.TENKHACHHANG)}
+                            </td>
+                            <td className="py-4 text-muted-foreground">
+                              {normalizeText(entry.TENNHANVIEN)}
+                            </td>
+                            <td className="py-4 text-muted-foreground">
+                              {normalizeText(entry.TENLOAI)}
+                            </td>
+                            <td className="py-4 text-muted-foreground">
+                              {formatCurrency(entry.GIATRI)}
+                            </td>
+                            <td className="py-4">
+                              <Badge
+                                variant="outline"
+                                className={`rounded-full ${getStatusTone(entry.TRANGTHAI)}`}
+                              >
+                                {normalizeText(entry.TRANGTHAI) || "-"}
+                              </Badge>
+                            </td>
+                            <td className="py-4 text-muted-foreground">
+                              {formatDate(entry.NGAYBATDAU)}
+                            </td>
+                            <td className="py-4 text-muted-foreground">
+                              {formatDate(entry.NGAYKETTHUC)}
+                            </td>
+                            <td className="py-4">
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openEditContractForm(entry)}
+                                >
+                                  Sửa
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() =>
+                                    void handleDeleteContract(entry)
+                                  }
+                                >
+                                  Xóa
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                    : null}
                   {filteredContracts.length === 0 ? (
                     <tr>
                       <td
@@ -1415,22 +1486,31 @@ export function AdminDashboard() {
                 <div className="flex items-center justify-end gap-2 mt-3">
                   <button
                     className="px-2 py-1 rounded border"
-                    onClick={() => setAssignmentsPage((p) => Math.max(1, p - 1))}
+                    onClick={() =>
+                      setAssignmentsPage((p) => Math.max(1, p - 1))
+                    }
                     disabled={assignmentsPage === 1}
                   >
                     Prev
                   </button>
                   <span className="text-sm text-muted-foreground">
-                    Trang {assignmentsPage} / {Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE)}
+                    Trang {assignmentsPage} /{" "}
+                    {Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE)}
                   </span>
                   <button
                     className="px-2 py-1 rounded border"
                     onClick={() =>
                       setAssignmentsPage((p) =>
-                        Math.min(Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE), p + 1),
+                        Math.min(
+                          Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE),
+                          p + 1,
+                        ),
                       )
                     }
-                    disabled={assignmentsPage >= Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE)}
+                    disabled={
+                      assignmentsPage >=
+                      Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE)
+                    }
                   >
                     Next
                   </button>

@@ -19,12 +19,15 @@ app.use(express.urlencoded({ extended: false }));
 app.use(morgan("dev"));
 
 // Debug: Log all incoming requests
+// Debug: Verbose request logging (temporary)
 app.use((req, res, next) => {
-  if (req.path.includes("/contracts")) {
+  try {
     console.log(
-      `[REQUEST] ${req.method} ${req.path}`,
-      `- Headers: x-role=${req.headers["x-role"]}, x-user-id=${req.headers["x-user-id"]}`,
+      `[REQUEST] ${req.method} ${req.originalUrl}`,
+      `- Headers: x-role=${req.headers["x-role"] || "(none)"}, x-user-id=${req.headers["x-user-id"] || "(none)"}`,
     );
+  } catch (err) {
+    // avoid logging errors from malformed headers
   }
   next();
 });

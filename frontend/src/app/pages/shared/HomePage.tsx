@@ -4,7 +4,6 @@ import {
   BarChart3,
   CheckCircle2,
   FileText,
-  HeartHandshake,
   Lock,
   Sparkles,
   ShieldCheck,
@@ -228,7 +227,7 @@ export function HomePage() {
 
                   <div className="mt-1 rounded-2xl border border-border/70 bg-white p-4">
                     <div className="mb-3 flex items-center gap-2">
-                      <HeartHandshake className="h-4 w-4 text-[#0284c7]" />
+                      <Users className="h-4 w-4 text-[#0284c7]" />
                       <p className="text-sm font-medium">Khách hàng nói gì?</p>
                     </div>
                     <div className="space-y-3">
