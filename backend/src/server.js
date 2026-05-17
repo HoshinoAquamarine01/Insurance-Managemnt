@@ -1,58 +1,43 @@
+require("dotenv").config();
+
 const app = require("./app");
-const { getPool } = require("./config/db");
+const { connectDB } = require("./config/mssql");
 
 const port = Number(process.env.PORT || 5000);
 
-// Catch all unhandled rejections
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[FATAL] Unhandled Promise Rejection:", reason);
-  console.error("[FATAL] Promise:", promise);
+process.on("unhandledRejection", (reason) => {
+  console.error("[LỖI] Promise bị reject không được xử lý:", reason);
+  process.exit(1);
 });
 
 process.on("uncaughtException", (error) => {
-  console.error("[FATAL] Uncaught Exception:", error);
-  console.error("[FATAL] Stack:", error.stack);
-  console.error("[FATAL] Attempting to continue running...");
+  console.error("[LỖI] Exception không được bắt:", error);
+  process.exit(1);
 });
 
-process.on("exit", (code) => {
-  console.error(`[PROCESS_EXIT] Node.js process exiting with code ${code}`);
-});
-
-async function startServer() {
-  try {
-    console.log("[SERVER] Initializing database pool...");
-    const pool = await getPool();
-    console.log("[SERVER] Database pool initialized successfully");
-  } catch (error) {
-    console.error("[SERVER] DB pool initialization failed:", error.message);
-    console.error(
-      "[SERVER] Continuing to start HTTP server without DB connection. Some endpoints may fail.",
-    );
-  }
-
-  const server = app.listen(port, () => {
-    console.log(`[SERVER] Server listening on port ${port}`);
-  });
-
-  server.on("error", (err) => {
-    console.error("[SERVER] HTTP Server error:", err.message);
-    if (err.code === "EADDRINUSE") {
-      console.error(
-        `[SERVER] Port ${port} is already in use. Please stop the other process or use a different port.`,
-      );
+connectDB()
+  .then(() => {
+    const server = app.listen(port, () => {
+      console.log(`[SERVER] Đang lắng nghe tại cổng ${port}`);
+    });
+    server.on("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(
+          `[SERVER] Cổng ${port} đang được sử dụng, vui lòng dùng cổng khác`,
+        );
+      } else {
+        console.error("[SERVER] Lỗi HTTP server:", err.message);
+      }
       process.exit(1);
-    }
-    console.error("[SERVER] Full error:", err);
+    });
+
+    server.on("close", () => console.log("[SERVER] HTTP server đã đóng"));
+    process.on("SIGTERM", () => server.close(() => process.exit(0)));
+    process.on("SIGINT", () => server.close(() => process.exit(0)));
+  })
+  .catch((err) => {
+    console.error(
+      "[DATABASE] Kết nối thất bại, một số endpoint có thể không hoạt động:",
+      err.message,
+    );
   });
-
-  server.on("close", () => {
-    console.log("[SERVER] HTTP Server closed");
-  });
-
-  return server;
-}
-
-const serverPromise = startServer().catch((err) => {
-  console.error("[SERVER_ERROR] Failed to start server:", err);
-});
