@@ -726,19 +726,6 @@ MIT License — Xem file `LICENSE` (nếu có)
 - No console errors/warnings
 - Follow code style guidelines
 
-## 📚 Tài Liệu Thêm
-
-- [Frontend Implementation Guide](./frontend/IMPLEMENTATION_GUIDE.md)
-- [Frontend Design Guidelines](./frontend/guidelines/Guidelines.md)
-- [Backend Setup](./backend/README.md)
-- [Database Schema](./backend/sql/init.sql)
-
-## 📞 Liên Hệ
-
-- **Bug Reports:** GitHub Issues
-- **Feature Requests:** GitHub Discussions
-- **Email Support:** team@yourdomain.com
-
 ---
 
 **Made with ❤️ by QLBH Team**
