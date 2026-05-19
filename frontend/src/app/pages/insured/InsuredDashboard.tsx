@@ -14,12 +14,17 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
+  User,
 } from "lucide-react";
 import { Progress } from "../../components/ui/progress";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { getCustomerContracts, getCustomerPayments } from "../../services/api";
+import {
+  getCustomerContracts,
+  getCustomerPayments,
+  getInsuredPersonalInfo,
+} from "../../services/api";
 import {
   PageHeader,
   StatsCard,
@@ -102,6 +107,7 @@ export function InsuredDashboard() {
   const { user } = useAuth();
   const [contracts, setContracts] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [personalInfo, setPersonalInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -111,14 +117,16 @@ export function InsuredDashboard() {
       if (!user) return;
 
       try {
-        const [contractsData, paymentsData] = await Promise.all([
+        const [contractsData, paymentsData, personalData] = await Promise.all([
           getCustomerContracts(user.id, user.role),
           getCustomerPayments(user.id, user.role),
+          getInsuredPersonalInfo(user.id, user.role),
         ]);
 
         if (isMounted) {
           setContracts(contractsData);
           setPayments(paymentsData);
+          setPersonalInfo(personalData);
         }
       } finally {
         if (isMounted) {
@@ -281,7 +289,7 @@ export function InsuredDashboard() {
         </CardContent>
       </Card>
 
-      {/* Contract and Recent Payments Grid */}
+    
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Contract Details */}
         <Card className="border-border/50">
@@ -451,6 +459,94 @@ export function InsuredDashboard() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Personal Information */}
+      {personalInfo && (
+        <Card className="border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5 text-[#0284c7]" />
+              Thông tin cá nhân
+            </CardTitle>
+            <CardDescription>
+              Thông tin đã đăng ký (chỉ xem, không chỉnh sửa)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Họ và tên
+                </p>
+                <p className="text-base">{personalInfo.HOTEN || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Email
+                </p>
+                <p className="text-base">{personalInfo.EMAIL || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Giới tính
+                </p>
+                <p className="text-base">{personalInfo.GIOITINH || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Ngày sinh
+                </p>
+                <p className="text-base">
+                  {personalInfo.NGAYSINH
+                    ? new Date(personalInfo.NGAYSINH).toLocaleDateString(
+                        "vi-VN",
+                      )
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  <FileText className="w-4 h-4" />
+                  CCCD
+                </p>
+                <p className="text-base font-mono">
+                  {personalInfo.CCCD
+                    ? String(personalInfo.CCCD)
+                    : personalInfo.CCCD_ENCRYPTED
+                      ? "✓ Được bảo vệ"
+                      : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Cơ quan cấp
+                </p>
+                <p className="text-base">{personalInfo.COQUAN || "-"}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Địa chỉ thường trú
+                </p>
+                <p className="text-base">
+                  {personalInfo.DIACHITHUONGTRU || "-"}
+                </p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Địa chỉ tạm trú
+                </p>
+                <p className="text-base">{personalInfo.DIACHITAMTRU || "-"}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Địa chỉ liên lạc
+                </p>
+                <p className="text-base">{personalInfo.DIACHILIENLAC || "-"}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

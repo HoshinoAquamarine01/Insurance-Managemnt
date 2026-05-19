@@ -8,6 +8,7 @@ const {
   getCustomerContracts,
   getCustomerPayments,
   getMedicalHistory,
+  getInsuredPersonalInfo,
 } = require("../controllers/customer.controller");
 
 const router = express.Router();
@@ -50,6 +51,12 @@ router.get(
     "ke_toan",
   ]),
   getCustomerPayments,
+);
+router.get(
+  "/:id/personal-info",
+  requireRole(["insured"]),
+  // Insured users can view their personal info: CCCD, address, etc. (read-only)
+  getInsuredPersonalInfo,
 );
 router.post(
   "/",

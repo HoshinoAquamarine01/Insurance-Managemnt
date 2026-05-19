@@ -5,6 +5,22 @@ const employeeModel = require("../models/employee.model");
 const customerModel = require("../models/customer.model");
 const { getPool, sql } = require("../config/db");
 
+async function writeAuditLog(pool, userId, tableName, dataId, action) {
+  try {
+    await pool
+      .request()
+      .input("IDNGUOIDUNG", sql.BigInt, userId || null)
+      .input("TENBANG", sql.NVarChar(50), tableName)
+      .input("IDDULIEU", sql.BigInt, Number(dataId))
+      .input("HANHDONG", sql.NVarChar(20), action).query(`
+        INSERT INTO NHATKY (IDNGUOIDUNG, TENBANG, IDDULIEU, HANHDONG, THOIGIAN)
+        VALUES (@IDNGUOIDUNG, @TENBANG, @IDDULIEU, @HANHDONG, GETUTCDATE())
+      `);
+  } catch (err) {
+    console.error("auth writeAuditLog failed:", err && err.message);
+  }
+}
+
 const loginRules = [body("tenDangNhap").notEmpty(), body("matKhau").notEmpty()];
 const updatePasswordRules = [
   body("userId").notEmpty(),
@@ -44,6 +60,19 @@ const login = asyncHandler(async (req, res) => {
     employee ? "FOUND" : "NOT FOUND",
   );
   if (employee) {
+    try {
+      const pool = await getPool();
+      // Fire-and-forget audit write for login
+      writeAuditLog(
+        pool,
+        employee.IDNGUOIDUNG,
+        "NGUOIDUNG",
+        employee.IDNGUOIDUNG,
+        "Đăng nhập",
+      );
+    } catch (e) {
+      console.error("audit write error (employee login):", e && e.message);
+    }
     return success(
       res,
       {
@@ -65,6 +94,18 @@ const login = asyncHandler(async (req, res) => {
     customer ? "FOUND" : "NOT FOUND",
   );
   if (customer) {
+    try {
+      const pool = await getPool();
+      writeAuditLog(
+        pool,
+        customer.IDNGUOIDUNG,
+        "NGUOIDUNG",
+        customer.IDNGUOIDUNG,
+        "Đăng nhập",
+      );
+    } catch (e) {
+      console.error("audit write error (customer login):", e && e.message);
+    }
     return success(
       res,
       {
@@ -80,6 +121,20 @@ const login = asyncHandler(async (req, res) => {
 
   console.log("[AUTH DEBUG] Login failed for:", tenDangNhap);
   return fail(res, "Invalid username or password", 401);
+});
+
+const logout = asyncHandler(async (req, res) => {
+  // Accept userId from body or from authenticated user
+  const userId = req.body?.userId || (req.user && req.user.id);
+
+  try {
+    const pool = await getPool();
+    await writeAuditLog(pool, userId, "NGUOIDUNG", userId, "Đăng xuất");
+  } catch (err) {
+    console.error("logout audit write failed:", err && err.message);
+  }
+
+  return success(res, null, "Logout recorded");
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
@@ -176,6 +231,7 @@ module.exports = {
   loginRules,
   updatePasswordRules,
   login,
+  logout,
   updateProfile,
   updatePassword,
 };

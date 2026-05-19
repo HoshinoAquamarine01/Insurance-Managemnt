@@ -6,14 +6,31 @@ const {
   updateProfile,
   updatePasswordRules,
   updatePassword,
+  logout,
 } = require("../controllers/auth.controller");
+const { requireRole } = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
 router.post("/login", loginRules, validateRequest, login);
-router.put("/profile/update", updateProfile);
-// Support legacy/frontend path: PUT /api/auth/profile
-router.put("/profile", updateProfile);
-router.put("/password", updatePasswordRules, validateRequest, updatePassword);
+router.post("/logout", logout);
+// Only non-insured roles may update profiles or passwords
+router.put(
+  "/profile/update",
+  requireRole(["creator", "accountant", "supervisor", "admin"]),
+  updateProfile,
+);
+router.put(
+  "/profile",
+  requireRole(["creator", "accountant", "supervisor", "admin"]),
+  updateProfile,
+);
+router.put(
+  "/password",
+  requireRole(["insured", "creator", "accountant", "supervisor", "admin"]),
+  updatePasswordRules,
+  validateRequest,
+  updatePassword,
+);
 
 module.exports = router;

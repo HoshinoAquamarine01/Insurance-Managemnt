@@ -56,6 +56,21 @@ const getCustomerPayments = asyncHandler(async (req, res) => {
   return success(res, data, "Customer payments fetched");
 });
 
+const getInsuredPersonalInfo = asyncHandler(async (req, res) => {
+  // Only insured users can view their own personal info
+  const targetUserId =
+    String(req.user?.role || "").toLowerCase() === "insured" && req.user?.id
+      ? req.user.id
+      : req.params.id;
+
+  if (!targetUserId) {
+    throw new Error("Missing or invalid user id");
+  }
+
+  const data = await customerModel.getInsuredInfo(targetUserId);
+  return success(res, data, "Insured personal info fetched");
+});
+
 module.exports = {
   customerCreateRules,
   getCustomers,
@@ -63,4 +78,5 @@ module.exports = {
   getCustomerContracts,
   getCustomerPayments,
   getMedicalHistory,
+  getInsuredPersonalInfo,
 };

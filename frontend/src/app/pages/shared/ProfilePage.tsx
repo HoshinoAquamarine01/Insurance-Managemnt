@@ -56,6 +56,7 @@ const roleLabels: Record<string, string> = {
 
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
+  const isInsured = user?.role === "insured";
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -150,7 +151,11 @@ export function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>Thông tin cá nhân</CardTitle>
-          <CardDescription>Cập nhật thông tin cá nhân của bạn</CardDescription>
+          <CardDescription>
+            {isInsured
+              ? "Bạn chỉ được phép xem thông tin cá nhân (chỉ đọc)."
+              : "Cập nhật thông tin cá nhân của bạn"}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -159,6 +164,8 @@ export function ProfilePage() {
               id="fullName"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              readOnly={isInsured}
+              disabled={isInsured}
             />
           </div>
 
@@ -169,23 +176,32 @@ export function ProfilePage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              readOnly={isInsured}
+              disabled={isInsured}
             />
           </div>
-
           <div className="flex justify-end gap-2">
-            <Button
-              onClick={handleSaveChanges}
-              disabled={isSaving}
-              className="gap-2"
-            >
-              <Save className="w-4 h-4" />
-              {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
-            </Button>
-            {saveMessage && (
-              <div
-                className={`text-sm ${saveMessage.includes("✓") ? "text-green-600" : "text-red-600"}`}
-              >
-                {saveMessage}
+            {!isInsured ? (
+              <>
+                <Button
+                  onClick={handleSaveChanges}
+                  disabled={isSaving}
+                  className="gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+                </Button>
+                {saveMessage && (
+                  <div
+                    className={`text-sm ${saveMessage.includes("✓") ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {saveMessage}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Bạn chỉ có quyền xem thông tin.
               </div>
             )}
           </div>
