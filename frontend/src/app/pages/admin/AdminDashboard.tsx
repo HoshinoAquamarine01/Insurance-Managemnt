@@ -58,6 +58,30 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 
+const ROLE_LABELS: Record<string, string> = {
+  CREATOR: "Người lập hợp đồng",
+  ACCOUNTANT: "Kế toán",
+  SUPERVISOR: "Giám sát",
+  INSURED: "Người được bảo hiểm",
+  ADMIN: "Quản trị viên",
+};
+
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  employee: "Nhân viên",
+  customer: "Khách hàng",
+};
+
+function getRoleLabel(code?: string) {
+  if (!code) return "-";
+  const key = String(code).toUpperCase().trim();
+  return ROLE_LABELS[key] || key.toLowerCase();
+}
+
+function getAccountTypeLabel(type?: string) {
+  if (!type) return "-";
+  return ACCOUNT_TYPE_LABELS[String(type).toLowerCase()] || String(type);
+}
+
 type UserFormState = {
   mode: "create" | "edit";
   id?: number;
@@ -1059,11 +1083,11 @@ export function AdminDashboard() {
                                   variant="outline"
                                   className="rounded-full capitalize"
                                 >
-                                  {String(entry.MAVAITRO || "-").toLowerCase()}
+                                  {getRoleLabel(entry.MAVAITRO)}
                                 </Badge>
                               </td>
                               <td className="py-4 text-muted-foreground capitalize">
-                                {entry.LOAI_TAI_KHOAN || "-"}
+                                {getAccountTypeLabel(entry.LOAI_TAI_KHOAN)}
                               </td>
                               <td className="py-4">
                                 <Badge
@@ -1447,7 +1471,7 @@ export function AdminDashboard() {
                           </td>
                           <td className="py-4">
                             <Badge variant="outline" className="rounded-full">
-                              {entry.MAVAITRO || "-"}
+                              {getRoleLabel(entry.MAVAITRO)}
                             </Badge>
                           </td>
                           <td className="py-4 text-muted-foreground">

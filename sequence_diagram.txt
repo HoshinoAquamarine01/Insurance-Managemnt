@@ -1,0 +1,78 @@
+
+%% Sơ đồ trình tự (Mermaid) - Các giải pháp bảo mật cơ sở dữ liệu của hệ thống QLBH
+%% Lưu file này dưới tên sequence_diagram.txt và hiển thị bằng Mermaid hoặc công cụ hỗ trợ Mermaid.
+sequenceDiagram
+    autonumber
+    participant NguoiDung as Người dùng
+    participant UngDung as Ứng dụng giao diện người dùng
+    participant MayChuUngDung as Máy chủ ứng dụng
+    participant DichVuXacThuc as Dịch vụ xác thực
+    participant DichVuPhanQuyen as Dịch vụ phân quyền
+    participant CoSoDuLieu as Cơ sở dữ liệu
+    participant TriggerNhatKy as Trigger ghi nhật ký
+    participant NhatKyHeThong as Bảng nhật ký hệ thống
+    participant KenhTruyenBaoMat as Kênh truyền bảo mật
+
+    %% 1. Đăng nhập và băm mật khẩu bằng SHA2_256 + salt
+    NguoiDung->>UngDung: Nhập tên đăng nhập và mật khẩu
+    UngDung->>KenhTruyenBaoMat: Gửi thông tin đăng nhập qua HTTPS
+    KenhTruyenBaoMat->>MayChuUngDung: Chuyển thông tin đến máy chủ
+    MayChuUngDung->>DichVuXacThuc: Kiểm tra thông tin đăng nhập
+    DichVuXacThuc->>CoSoDuLieu: Lấy salt và giá trị băm đã lưu
+    CoSoDuLieu-->>DichVuXacThuc: Trả về salt và giá trị băm
+    DichVuXacThuc->>DichVuXacThuc: Băm lại mật khẩu bằng SHA2_256 và salt
+    DichVuXacThuc-->>MayChuUngDung: Trả kết quả xác thực
+    MayChuUngDung-->>UngDung: Trả mã truy cập nếu hợp lệ
+    UngDung-->>NguoiDung: Hiển thị màn hình làm việc
+
+    %% 2. Kiểm tra quyền truy cập theo vai trò
+    NguoiDung->>UngDung: Yêu cầu thao tác trên dữ liệu nghiệp vụ
+    UngDung->>KenhTruyenBaoMat: Gửi yêu cầu kèm mã truy cập
+    KenhTruyenBaoMat->>MayChuUngDung: Chuyển yêu cầu đến máy chủ
+    MayChuUngDung->>DichVuPhanQuyen: Kiểm tra vai trò và quyền hạn
+    DichVuPhanQuyen->>CoSoDuLieu: Tra cứu vai trò và quyền được cấp
+    CoSoDuLieu-->>DichVuPhanQuyen: Trả về thông tin phân quyền
+    DichVuPhanQuyen-->>MayChuUngDung: Cho phép hoặc từ chối thao tác
+    MayChuUngDung-->>UngDung: Trả kết quả truy cập phù hợp
+    UngDung-->>NguoiDung: Hiển thị dữ liệu hoặc thông báo từ chối
+
+    %% 3. Mã hóa dữ liệu nhạy cảm trước khi lưu bằng AES-256
+    NguoiDung->>UngDung: Nhập thông tin CCCD và lịch sử bệnh
+    UngDung->>KenhTruyenBaoMat: Gửi dữ liệu qua kết nối an toàn
+    KenhTruyenBaoMat->>MayChuUngDung: Chuyển dữ liệu đến máy chủ
+    MayChuUngDung->>MayChuUngDung: Xác minh quyền ghi dữ liệu
+    MayChuUngDung->>CoSoDuLieu: Yêu cầu mở khóa mã hóa đối xứng AES-256
+    CoSoDuLieu-->>MayChuUngDung: Cho phép sử dụng khóa mã hóa AES-256
+    MayChuUngDung->>CoSoDuLieu: Ghi dữ liệu đã mã hóa bằng ENCRYPTBYKEY với AES-256
+    CoSoDuLieu-->>MayChuUngDung: Xác nhận lưu thành công
+    MayChuUngDung-->>UngDung: Trả kết quả lưu dữ liệu
+
+    %% 4. Ngăn chặn SQL Injection bằng tham số hóa truy vấn
+    NguoiDung->>UngDung: Nhập dữ liệu tìm kiếm hoặc cập nhật
+    UngDung->>KenhTruyenBaoMat: Gửi dữ liệu đầu vào an toàn
+    KenhTruyenBaoMat->>MayChuUngDung: Chuyển yêu cầu đến máy chủ
+    MayChuUngDung->>MayChuUngDung: Tạo truy vấn tham số hóa hoặc thủ tục lưu trữ
+    MayChuUngDung->>CoSoDuLieu: Thực thi truy vấn đã tham số hóa
+    CoSoDuLieu-->>MayChuUngDung: Trả kết quả truy vấn
+    MayChuUngDung-->>UngDung: Trả dữ liệu hợp lệ
+
+    %% 5. Ghi nhật ký thao tác quan trọng
+    NguoiDung->>UngDung: Thực hiện thêm, sửa hoặc xác nhận thanh toán
+    UngDung->>KenhTruyenBaoMat: Gửi thao tác đến máy chủ
+    KenhTruyenBaoMat->>MayChuUngDung: Chuyển yêu cầu đến máy chủ
+    MayChuUngDung->>CoSoDuLieu: Thực hiện thao tác nghiệp vụ
+    CoSoDuLieu->>TriggerNhatKy: Kích hoạt ghi nhật ký sau INSERT, UPDATE hoặc DELETE
+    TriggerNhatKy->>NhatKyHeThong: Lưu người thực hiện, bảng, mã dữ liệu, hành động và thời gian
+    NhatKyHeThong-->>TriggerNhatKy: Xác nhận ghi nhật ký
+    CoSoDuLieu-->>MayChuUngDung: Xác nhận hoàn tất thao tác
+    MayChuUngDung-->>UngDung: Trả kết quả cho người dùng
+
+    %% 6. Bảo vệ dữ liệu trong quá trình truyền bằng TLS 1.2 / TLS 1.3
+    UngDung->>KenhTruyenBaoMat: Mọi trao đổi dữ liệu đều đi qua HTTPS sử dụng TLS 1.2 hoặc TLS 1.3
+    KenhTruyenBaoMat->>MayChuUngDung: Mã hóa toàn bộ dữ liệu trên đường truyền bằng TLS 1.2 hoặc TLS 1.3
+    MayChuUngDung->>CoSoDuLieu: Kết nối đến cơ sở dữ liệu với chế độ mã hóa đường truyền
+    CoSoDuLieu-->>MayChuUngDung: Trả dữ liệu trong phiên truyền an toàn
+
+    %% Ghi chú: Có thể kết hợp kiểm tra đăng nhập hai lớp và cảnh báo truy cập bất thường để tăng mức an toàn
+
+

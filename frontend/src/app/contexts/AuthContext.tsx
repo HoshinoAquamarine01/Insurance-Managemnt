@@ -74,8 +74,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("insurance_user");
+    (async () => {
+      try {
+        const stored = window.localStorage.getItem("insurance_user");
+        const parsed = stored ? JSON.parse(stored) : null;
+        const userId = parsed?.id ? String(parsed.id) : undefined;
+        // notify backend for audit log; ignore errors
+        await (await import("../services/api")).logoutRequest(userId);
+      } catch (e) {
+        // ignore
+      } finally {
+        setUser(null);
+        localStorage.removeItem("insurance_user");
+      }
+    })();
   };
 
   return (

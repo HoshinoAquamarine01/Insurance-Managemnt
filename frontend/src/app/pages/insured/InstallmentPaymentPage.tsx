@@ -422,7 +422,11 @@ export function InstallmentPaymentPage() {
     () =>
       [...payments]
         .filter((item) => !isPaidStatus(item))
-        .sort((left, right) => getDueDateTime(right) - getDueDateTime(left)),
+        .sort(
+          (left, right) =>
+            getDueDateTime(left) - getDueDateTime(right) ||
+            Number(left.IDKY) - Number(right.IDKY),
+        ),
     [payments],
   );
 

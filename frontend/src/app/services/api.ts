@@ -68,6 +68,13 @@ export async function loginRequest(tenDangNhap: string, matKhau: string) {
   });
 }
 
+export async function logoutRequest(userId?: string) {
+  return apiRequest<any>("/auth/logout", {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
 export async function getDashboardSummary(role: string) {
   return apiRequest<any>("/dashboard/summary", { role });
 }
@@ -90,6 +97,10 @@ export async function getCustomerContracts(customerId: string, role: string) {
 
 export async function getCustomerPayments(customerId: string, role: string) {
   return apiRequest<any[]>(`/customers/${customerId}/payments`, { role });
+}
+
+export async function getInsuredPersonalInfo(customerId: string, role: string) {
+  return apiRequest<any>(`/customers/${customerId}/personal-info`, { role });
 }
 
 export async function getExpiredContracts(role: string) {

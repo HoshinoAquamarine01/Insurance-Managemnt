@@ -167,12 +167,69 @@ async function getPaymentsByCustomer(idNguoidung) {
   return result.recordset;
 }
 
+async function getInsuredInfo(idNguoidung) {
+  const pool = await getPool();
+
+  // Get insured personal info: CCCD, DIACHITHUONGTRU, etc.
+  try {
+    // Open symmetric key, decrypt CCCD, then close key in same session
+    const result = await pool
+      .request()
+      .input("IDNGUOIDUNG", sql.BigInt, idNguoidung).query(`
+        OPEN SYMMETRIC KEY SymKeyQlbhAES DECRYPTION BY CERTIFICATE CertQlbhEncryption;
+        SELECT 
+          NDB.IDNGUOIDUOCBH,
+          NDB.HOTEN,
+          CONVERT(VARCHAR(50), DecryptByKey(NDB.CCCD)) AS CCCD,
+          NDB.GIOITINH,
+          NDB.NGAYSINH,
+          NDB.COQUAN,
+          NDB.DIACHITHUONGTRU,
+          NDB.DIACHITAMTRU,
+          NDB.DIACHILIENLAC,
+          ND.EMAIL,
+          ND.TENDANGNHAP
+        FROM NGUOIDUOCBAOHIEM NDB
+        INNER JOIN NGUOIDUNG ND ON NDB.IDNGUOIDUNG = ND.IDNGUOIDUNG
+        WHERE NDB.IDNGUOIDUNG = @IDNGUOIDUNG;
+        CLOSE SYMMETRIC KEY SymKeyQlbhAES;
+      `);
+
+    return result.recordset[0] || null;
+  } catch (err) {
+    // If decryption fails (e.g., missing permissions), fall back to returning encrypted value as a hint
+    console.error("getInsuredInfo: decryption failed:", err && err.message);
+    const fallback = await pool
+      .request()
+      .input("IDNGUOIDUNG", sql.BigInt, idNguoidung).query(`
+        SELECT 
+          NDB.IDNGUOIDUOCBH,
+          NDB.HOTEN,
+          CONVERT(VARCHAR(20), CONVERT(VARBINARY(MAX), NDB.CCCD)) AS CCCD_ENCRYPTED,
+          NDB.GIOITINH,
+          NDB.NGAYSINH,
+          NDB.COQUAN,
+          NDB.DIACHITHUONGTRU,
+          NDB.DIACHITAMTRU,
+          NDB.DIACHILIENLAC,
+          ND.EMAIL,
+          ND.TENDANGNHAP
+        FROM NGUOIDUOCBAOHIEM NDB
+        INNER JOIN NGUOIDUNG ND ON NDB.IDNGUOIDUNG = ND.IDNGUOIDUNG
+        WHERE NDB.IDNGUOIDUNG = @IDNGUOIDUNG
+      `);
+
+    return fallback.recordset[0] || null;
+  }
+}
+
 module.exports = {
   getAllCustomers,
   createCustomer,
   loginCustomer,
   getContractsByCustomer,
   getPaymentsByCustomer,
+  getInsuredInfo,
 };
 
 async function getMedicalHistoryByInsuredId(idNguoiDuocBh) {

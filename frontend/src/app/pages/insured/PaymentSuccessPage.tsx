@@ -39,7 +39,7 @@ export function PaymentSuccessPage() {
 
     // Auto-redirect after 5 seconds
     const timer = setTimeout(() => {
-      navigate("/payments?refetch=1", { replace: true });
+      navigate("/my-contract", { replace: true });
     }, 5000);
 
     return () => clearTimeout(timer);
