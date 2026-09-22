@@ -719,14 +719,6 @@ MIT License — Xem file `LICENSE` (nếu có)
 4. Push to branch: `git push origin feature/amazing-feature`
 5. Open Pull Request
 
-**Code Review Process:**
-
-- Tối thiểu 1 reviewer
-- All tests must pass
-- No console errors/warnings
-- Follow code style guidelines
-
----
 
 **Made with ❤️ by QLBH Team**
 
