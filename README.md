@@ -705,11 +705,6 @@ DEBUG=* npm run dev
 
 MIT License — Xem file `LICENSE` (nếu có)
 
-## 👨‍💼 Team
-
-**Project Owner:** QLBH Team  
-**Maintainers:** Development Team  
-**Contributors:** Welcome! Xem phần Contributing bên dưới
 
 ## 🤝 Contributing
 
